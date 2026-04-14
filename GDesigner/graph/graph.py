@@ -93,23 +93,29 @@ class Graph(ABC):
         num_nodes = self.num_nodes
         role_adj = torch.zeros((num_nodes,num_nodes))
         role_2_id = {}
-        
-        for edge in role_connect:
-            in_role, out_role = edge
-            role_2_id[in_role] = []
-            role_2_id[out_role] = []
+
+        # First: register every actual node role
         for i, node_id in enumerate(self.nodes):
             role = self.nodes[node_id].role
+            if role not in role_2_id:
+                role_2_id[role] = []
             role_2_id[role].append(i)
-            
+
         for edge in role_connect:
-            in_role,out_role = edge
+            in_role, out_role = edge
+            if in_role not in role_2_id:
+                role_2_id[in_role] = []
+            if out_role not in role_2_id:
+                role_2_id[out_role] = []
+
+        for edge in role_connect:
+            in_role, out_role = edge
             in_ids = role_2_id[in_role]
             out_ids = role_2_id[out_role]
             for in_id in in_ids:
                 for out_id in out_ids:
                     role_adj[in_id][out_id] = 1
-        
+
         edge_index, edge_weight = dense_to_sparse(role_adj)
         return edge_index
     
