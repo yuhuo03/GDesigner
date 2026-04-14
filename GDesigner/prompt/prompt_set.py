@@ -43,12 +43,12 @@ class PromptSet(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_websearch_prompt(query) -> str:
+    def get_websearch_prompt(question, query) -> str:
         """ TODO """
 
     @staticmethod
     @abstractmethod
-    def get_distill_websearch_prompt(query, results) -> str:
+    def get_distill_websearch_prompt(question, query, results) -> str:
         """ TODO """
 
     @staticmethod
@@ -57,7 +57,7 @@ class PromptSet(ABC):
         """ TODO """
 
     @staticmethod
-    def get_react_prompt(question, solutions, feedback) -> str:
+    def get_react_prompt(question, solution, feedback) -> str:
         """ TODO """
 
     # @staticmethod
