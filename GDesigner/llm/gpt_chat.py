@@ -23,25 +23,30 @@ MINE_API_KEYS = os.getenv('API_KEY')
 async def achat(
     model: str,
     msg: List[Dict],):
-    request_url = MINE_BASE_URL
+    base = MINE_BASE_URL.rstrip('/')
+    if base.endswith('/v1'):
+        request_url = base + "/chat/completions"
+    else:
+        request_url = base + "/v1/chat/completions"
     authorization_key = MINE_API_KEYS
     headers = {
         'Content-Type': 'application/json',
-        'authorization': authorization_key
+        'Authorization': 'Bearer ' + authorization_key
     }
     data = {
-        "name": model,
-        "inputs": {
-            "stream": False,
-            "msg": repr(msg),
-        }
+        "model": model,
+        "messages": msg,
     }
     async with aiohttp.ClientSession() as session:
-        async with session.post(request_url, headers=headers ,json=data) as response:
+        async with session.post(request_url, headers=headers, json=data) as response:
             response_data = await response.json()
-            prompt = "".join([item['content'] for item in msg])
-            cost_count(prompt,response_data['data'],model)
-            return response_data['data']
+            if 'error' in response_data:
+                raise Exception(f"API error {response.status}: {response_data['error']}")
+            content = response_data['choices'][0]['message']['content']
+            prompt_text = "".join(item.get('content', '') for item in msg)
+            cost_count(prompt_text, content, model)
+            return content
+
 
 @LLMRegistry.register('GPTChat')
 class GPTChat(LLM):
