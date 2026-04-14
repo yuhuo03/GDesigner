@@ -130,25 +130,32 @@ def get_kwargs(mode:Union[Literal['DirectAnswer'],Literal['FullConnected'],Liter
     elif mode=='FullConnected' or mode == 'FakeFullConnected' or mode=='FakeAGFull':
         fixed_spatial_masks = [[1 if i!=j else 0 for i in range(N)] for j in range(N)]
         fixed_temporal_masks = [[1 for _ in range(N)] for _ in range(N)]
+        node_kwargs = None
     elif mode=='Random' or mode == 'FakeRandom' or mode == 'FakeAGRandom':
         fixed_spatial_masks = [[random.randint(0, 1)  if i!=j else 0 for i in range(N)] for j in range(N)]
         fixed_temporal_masks = [[random.randint(0, 1) for _ in range(N)] for _ in range(N)]
+        node_kwargs = None
     elif mode=='Chain' or mode == 'FakeChain':
         fixed_spatial_masks = [[1 if i==j+1 else 0 for i in range(N)] for j in range(N)]
         fixed_temporal_masks = [[1 if i==0 and j==N-1 else 0 for i in range(N)] for j in range(N)]
+        node_kwargs = None
     elif mode == 'Debate':
         fixed_spatial_masks = [[0 for i in range(N)] for j in range(N)]
         fixed_temporal_masks = [[1 for i in range(N)] for j in range(N)]
+        node_kwargs = None
     elif mode == 'Layered':
         fixed_spatial_masks = generate_layered_graph(N)
         fixed_temporal_masks = [[1 for i in range(N)] for j in range(N)]
+        node_kwargs = None
     elif mode == 'Mesh' or mode=='FakeMesh':
         fixed_spatial_masks = generate_mesh_graph(N)
         fixed_temporal_masks = [[1 for i in range(N)] for j in range(N)]
+        node_kwargs = None
     elif mode == 'Star' or mode=='FakeStar':
         fixed_spatial_masks = generate_star_graph(N)
         fixed_temporal_masks = [[1 for i in range(N)] for j in range(N)]
-    
+        node_kwargs = None
+
     if 'Fake' in mode and 'AG' not in mode:
         node_kwargs = [{'role':'Fake'} if i % 2 == N % 2 else {'role':'Normal'} for i in range(N)]
     elif 'Fake' in mode and 'AG' in mode:
