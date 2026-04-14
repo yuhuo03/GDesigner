@@ -6,7 +6,7 @@ from GDesigner.prompt.prompt_set_registry import PromptSetRegistry
 from GDesigner.prompt.common import get_combine_materials
 
 
-roles = itertools.cycle(['Knowlegable Expert',
+roles = itertools.cycle(['Knowledgeable Expert',
                         #  'Wiki Searcher',
                          'Critic',
                          'Mathematician',
@@ -19,9 +19,9 @@ roles = itertools.cycle(['Knowlegable Expert',
 
 
 ROLE_DESCRIPTION = {
-"Knowlegable Expert":
+"Knowledgeable Expert":
 """
-You are a knowlegable expert in question answering.
+You are a knowledgeable expert in question answering.
 Please give several key entities that need to be searched in wikipedia to solve the problem, for example: catfish effect, broken window effect, Shakespeare.
 If there is no entity in the question that needs to be searched in Wikipedia, you don't have to provide it
 """,
@@ -76,15 +76,15 @@ You are a liar who only tell lies.
 """,
 }
 
-ROLE_CONNECTION = [('Knowlegable Expert','Mathematician'),
-                   ('Knowlegable Expert','Economist'),
-                   ('Knowlegable Expert','Lawyer'),
-                   ('Knowlegable Expert','Critic'),
-                   ('Knowlegable Expert','Psychologist'),
-                   ('Knowlegable Expert','Doctor'),
-                   ('Knowlegable Expert','Historian'),
-                   ('Knowlegable Expert','Programmer'),
-                   ('Knowlegable Expert','Critic'),
+ROLE_CONNECTION = [('Knowledgeable Expert','Mathematician'),
+                   ('Knowledgeable Expert','Economist'),
+                   ('Knowledgeable Expert','Lawyer'),
+                   ('Knowledgeable Expert','Critic'),
+                   ('Knowledgeable Expert','Psychologist'),
+                   ('Knowledgeable Expert','Doctor'),
+                   ('Knowledgeable Expert','Historian'),
+                   ('Knowledgeable Expert','Programmer'),
+                   ('Knowledgeable Expert','Critic'),
                    ('Mathematician','Critic'),
                    ('Mathematician','Critic'),
                    ('Psychologist','Critic'),
@@ -93,16 +93,16 @@ ROLE_CONNECTION = [('Knowlegable Expert','Mathematician'),
                    ('Critic','Psychologist'),
                    ('Psychologist','Doctor'),
                    ('Doctor','Historian'),
-                   ('Historian','Knowlegable Expert'),
+                   ('Historian','Knowledgeable Expert'),
                    ('Programmer','Mathematician'),
-                   ('Programmer','Knowlegable Expert'),
+                   ('Programmer','Knowledgeable Expert'),
                     ('Mathematician','Programmer'),
                     ('Programmer','Economist'),
                     ('Economist','Psychologist'),
-                    ('Psychologist','Knowlegable Expert'),
+                    ('Psychologist','Knowledgeable Expert'),
                     ('Critic','Historian'),
                     ('Historian','Economist'),
-                    ('Lawyer','Knowlegable Expert'),
+                    ('Lawyer','Knowledgeable Expert'),
                     ('Doctor','Lawyer'),
                     ('Mathematician','Doctor'),
                     ('Programmer','Critic'),
@@ -128,10 +128,12 @@ class MMLUPromptSet(PromptSet):
     def get_decision_role():
         return "You are the top decision-maker and are good at analyzing and summarizing other people's opinions, finding errors and giving final answers."
     
-    def get_role_connection(self):
+    @staticmethod
+    def get_role_connection():
         return ROLE_CONNECTION
     
-    def get_description(self,role):
+    @staticmethod
+    def get_description(role):
         return ROLE_DESCRIPTION[role]
     
     @staticmethod
@@ -175,7 +177,7 @@ The first line of your reply must contain only one letter(for example : A, B, C 
     
     @staticmethod
     def get_format():
-        return NotImplementedError
+        raise NotImplementedError("get_format is not implemented for MMLUPromptSet")
 
     @staticmethod
     def get_answer_prompt(question):
@@ -190,7 +192,7 @@ The first line of your reply must contain only one letter(for example : A, B, C 
         raise NotImplementedError
 
     @staticmethod
-    def get_websearch_prompt(query):
+    def get_websearch_prompt(question, query):
         raise NotImplementedError
 
     @staticmethod
@@ -200,19 +202,23 @@ The first line of your reply must contain only one letter(for example : A, B, C 
                 Your reply must be less than 100 words.
                 The first line of your reply must contain only one letter(for example : A, B, C or D)
                 """
-    # @staticmethod
-    # def get_adversarial_answer_prompt(question):
-    #     return f"""Randomly output a letter from ABCD on the first line.
-    #             Then output any gibberish paragraph on the same topic as the following question: {question}.
-    #             The first line of your reply must contain only one letter(for example : A, B, C or D)
-    #             """
     @staticmethod
-    def get_distill_websearch_prompt(query, results):
+    def get_distill_websearch_prompt(question, query, results):
         raise NotImplementedError
 
     @staticmethod
     def get_reflect_prompt(question, answer):
         raise NotImplementedError
+
+    @staticmethod
+    def get_react_prompt(question, solution, feedback):
+        return (
+            f"Here is an unsuccessful attempt for solving the following question:\n"
+            f"Question:\n{question}\n"
+            f"Attempted Solution:\n{solution}\n"
+            f"Feedback:\n{feedback}\n"
+            f"Rewrite the solution based on the feedback."
+        )
 
     @staticmethod
     def get_combine_materials(materials: Dict[str, Any]) -> str:
