@@ -53,10 +53,18 @@ class MMLUDataset(ABC):
     def __len__(self) -> int:
         return len(self._total_df)
 
-    def __getitem__(self, index: int) -> pd.DataFrame:
-        record = self._total_df.iloc[index]
-        assert isinstance(record, pd.DataFrame) or isinstance(record, pd.Series)
-        return record
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
+
+    def __getitem__(self, index) -> pd.Series | list[pd.Series]:
+        if isinstance(index, (int, np.integer)):
+            return self._total_df.iloc[index]
+        elif isinstance(index, slice):
+            records = self._total_df.iloc[index]
+            return [records.iloc[i] for i in range(len(records))]
+        else:
+            raise TypeError(f"indices must be int or slice, not {type(index)}")
 
     @staticmethod
     def record_to_input(record: pd.DataFrame) -> Dict[str, Any]:
