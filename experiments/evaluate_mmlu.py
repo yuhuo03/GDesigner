@@ -53,7 +53,8 @@ async def evaluate(
             # print(input_dict)
             answer_log_probs.append(asyncio.create_task(realized_graph.arun(input_dict,num_rounds)))
         raw_results = await asyncio.gather(*answer_log_probs)
-        raw_answers, log_probs = zip(*raw_results)
+        raw_answers = [r[0] for r in raw_results]
+        log_probs  = [r[1] for r in raw_results]
         print(f"Batch time {time.time() - start_ts:.3f}")
         for raw_answer, record in zip(raw_answers, record_batch):
             print("Raw answer:", raw_answer)
