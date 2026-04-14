@@ -1,9 +1,9 @@
-import os
 import json
 import math
 import time
 import asyncio
-from typing import Union,Literal,Optional,Iterator,List,Any,Dict
+from pathlib import Path
+from typing import Optional, Iterator, List, Any, Dict, Union
 from tqdm import tqdm
 import copy
 
@@ -11,18 +11,33 @@ from GDesigner.graph.graph import Graph
 from experiments.accuracy import Accuracy
 from GDesigner.utils.globals import Cost, PromptTokens, CompletionTokens
 
+
+def load_result(result_file: Path) -> List[Dict[str, Any]]:
+    if not result_file.exists():
+        with open(result_file, "w", encoding="utf-8") as file:
+            json.dump([], file)
+
+    with open(result_file, "r", encoding="utf-8") as file:
+        return json.load(file)
+
 async def evaluate(
         graph:Graph,
         dataset,
         num_rounds:int = 1,
         limit_questions: Optional[int] = None,
         eval_batch_size: int = 4,
+        result_file: Optional[Union[str, Path]] = None,
         ) -> float:
 
     print(f"Evaluating gdesigner on {dataset.__class__.__name__} split {dataset.split}")
     
     graph.gcn.eval()
     accuracy = Accuracy()
+    total_correct = 0
+    total_executed = 0
+    result_path = Path(result_file) if result_file is not None else None
+    result_data = load_result(result_path) if result_path is not None else None
+
     def eval_loader(batch_size: int) -> Iterator[List[Any]]:
         records = []
         for i_record, record in enumerate(dataset):
@@ -54,7 +69,6 @@ async def evaluate(
             answer_log_probs.append(asyncio.create_task(realized_graph.arun(input_dict,num_rounds)))
         raw_results = await asyncio.gather(*answer_log_probs)
         raw_answers = [r[0] for r in raw_results]
-        log_probs  = [r[1] for r in raw_results]
         print(f"Batch time {time.time() - start_ts:.3f}")
         for raw_answer, record in zip(raw_answers, record_batch):
             print("Raw answer:", raw_answer)
@@ -62,8 +76,29 @@ async def evaluate(
             print("Postprocessed answer:", answer)
             correct_answer = dataset.record_to_target_answer(record)
             print("Correct answer:", correct_answer)
+            is_correct = answer == correct_answer
+            total_correct += int(is_correct)
+            total_executed += 1
             accuracy.update(answer, correct_answer)
             accuracy.print()
+            if result_data is not None:
+                result_data.append({
+                    "Question": record["question"],
+                    "Option_A": record["A"],
+                    "Option_B": record["B"],
+                    "Option_C": record["C"],
+                    "Option_D": record["D"],
+                    "GT_Answer": correct_answer,
+                    "Pred_Answer": answer,
+                    "Raw_Answer": raw_answer,
+                    "Solved": bool(is_correct),
+                    "Total_Solved": total_correct,
+                    "Total_Executed": total_executed,
+                    "Accuracy": total_correct / total_executed,
+                })
+        if result_path is not None:
+            with open(result_path, "w", encoding="utf-8") as file:
+                json.dump(result_data, file, indent=2, ensure_ascii=False)
         print(f"Cost {Cost.instance().value}")
         print(f"PromptTokens {PromptTokens.instance().value}")
         print(f"CompletionTokens {CompletionTokens.instance().value}")
@@ -71,10 +106,3 @@ async def evaluate(
     print("Done!")
 
     return accuracy.get()
-
-
-def dump_eval_results(self, dct: Dict[str, Any]) -> None:
-    if self._art_dir_name is not None:
-        eval_json_name = os.path.join(self._art_dir_name, "evaluation.json")
-        with open(eval_json_name, "w") as f:
-            json.dump(dct, f)

@@ -3,9 +3,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.stdout.reconfigure(encoding='utf-8')
 
 import asyncio
-from typing import Union, Literal, List
 import argparse
 import random
+import time
+from pathlib import Path
+from typing import Union, Literal, List
 
 from GDesigner.graph.graph import Graph
 from datasets.mmlu_dataset import MMLUDataset
@@ -13,6 +15,7 @@ from datasets.MMLU.download import download
 from experiments.train_mmlu import train
 from experiments.evaluate_mmlu import evaluate
 from GDesigner.utils.const import GDesigner_ROOT
+from GDesigner.utils.globals import Time
 
 
 
@@ -71,6 +74,12 @@ async def main():
                   optimized_spatial=args.optimized_spatial,
                   optimized_temporal=args.optimized_temporal,
                   **kwargs)
+    current_time = Time.instance().value or time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+    Time.instance().value = current_time
+    result_dir = Path(GDesigner_ROOT / "result" / "mmlu")
+    result_dir.mkdir(parents=True, exist_ok=True)
+    result_file = result_dir / f"{args.llm_name}_{current_time}.json"
+
     download()
     dataset_train = MMLUDataset('dev')
     dataset_val = MMLUDataset('val')
@@ -80,8 +89,16 @@ async def main():
                     lr=args.lr,batch_size=args.batch_size)
         
     
-    score = await evaluate(graph=graph,dataset=dataset_val,num_rounds=args.num_rounds,limit_questions=limit_questions,eval_batch_size=args.batch_size)
+    score = await evaluate(
+        graph=graph,
+        dataset=dataset_val,
+        num_rounds=args.num_rounds,
+        limit_questions=limit_questions,
+        eval_batch_size=args.batch_size,
+        result_file=result_file,
+    )
     print(f"Score: {score}")
+    print(f"Result file: {result_file}")
 
 
 
