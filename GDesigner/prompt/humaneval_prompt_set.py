@@ -73,7 +73,7 @@ ROLE_CONNECTION = [('Project Manager','Algorithm Designer'),
                    ('Bug Fixer','Programming Expert'),
                    ('Test Analyst','Programming Expert'),
                    ('Algorithm Designer','Test Analyst'),
-                   ('Project Manager','Promgramming Expert')]
+                   ('Project Manager','Programming Expert')]
 
 @PromptSetRegistry.register('humaneval')
 class HumanEvalPromptSet(PromptSet):
@@ -86,10 +86,12 @@ class HumanEvalPromptSet(PromptSet):
     def get_constraint(role):
         return ROLE_DESCRIPTION[role]
 
-    def get_description(self,role):
+    @staticmethod
+    def get_description(role):
         return ROLE_DESCRIPTION[role]
     
-    def get_role_connection(self):
+    @staticmethod
+    def get_role_connection():
         return ROLE_CONNECTION
     
     @staticmethod
@@ -103,7 +105,7 @@ class HumanEvalPromptSet(PromptSet):
 
     @staticmethod
     def get_react_prompt(question, solution, feedback):
-        return f"""Here is an unsuccessful attempt for solving the folloing question:
+        return f"""Here is an unsuccessful attempt for solving the following question:
 Question:
 {question}
 Attempted Solution:
@@ -117,12 +119,9 @@ Rewrite the code based on the feedback and the following question:
     def get_query_prompt(question):
         return (
 "# Information Gathering for Question Resolution\n\n"
-"Evaluate if additional information is needed to answer the question. "
-#"If web search or file analysis is required, formulate specific queries to assist in finding the answer.\n\n"
+"Evaluate if additional information is needed to answer the question.\n"
 "If a web search or file analysis is necessary, outline specific clues or details to be searched for.\n\n"
 f"## ❓ Target Question:\n{question}\n\n"
-# "## 🤔 Information Gathering:\n"
-# "Identify if a web search or file reading is necessary and outline the approach."
 "## 🔍 Clues for Investigation:\n"
 "Identify critical clues and concepts within the question that are essential for finding the answer.\n"
         )
@@ -131,11 +130,6 @@ f"## ❓ Target Question:\n{question}\n\n"
     @staticmethod
     def get_file_analysis_prompt(query, file):
         return (
-            # "# File Analysis Required\n\n"
-            # f"## 🔍 Required Information to Extract:\n---\n{query}\n---\n\n"
-            # f"## 📄 File Content for Analysis:\n---\n{file}\n---\n\n"
-            # "## 🤔 Instructions:\n"
-            # "Extract the specified information from the file. Example: 'Identify the main theme in the text.'"
 "# File Analysis Task\n\n"
 f"## 🔍 Information Extraction Objective:\n---\n{query}\n---\n\n"
 f"## 📄 File Under Analysis:\n---\n{file}\n---\n\n"
@@ -163,28 +157,31 @@ f"## 📄 File Under Analysis:\n---\n{file}\n---\n\n"
 
     @staticmethod
     def get_adversarial_answer_prompt(question):
-        pass
+        return (
+"# Adversarial Challenge Task\n\n"
+f"## Target Question:\n---\n{question}\n---\n\n"
+"## 📋 Instructions:\n"
+"1. Identify potential weaknesses or edge cases in the question.\n"
+"2. Analyze the question from an adversarial perspective.\n"
+"3. Provide an improved or corrected version of the answer that addresses these weaknesses.\n"
+"4. Write your full implementation using a Python code block:\n```python\n# Your implementation here\n```\n"
+"Do not include anything other than Python code blocks in your response."
+        )
 
 
     @staticmethod
     def get_distill_websearch_prompt(question, query, results):
         return (
-            # "# Summarization of Search Results\n\n"
-            # "## 🔍 Required Information for Summary:\n---\n{query}\n---\n\n"
-            # "## 🌐 Search Results for Analysis:\n---\n{results}\n---\n\n"
-            # "## ✏️ Instructions:\n"
-            # "Summarize the key findings from the search results related to the query. "
-            # "Focus on relevant information. Example: 'Summary of key points...'"
 "# Summarization of Search Results\n\n"
-f"## Original question: \n---\n{question}\n---\n\n"
+f"## Original question:\n---\n{question}\n---\n\n"
 f"## 🔍 Required Information for Summary:\n---\n{query}\n---\n\n"
 f"## 🌐 Analyzed Search Results:\n---\n{results}\n---\n\n"
 "## 📝 Instructions for Summarization:\n"
 "1. Review the provided search results and identify the most relevant information related to the question and query.\n"
 "2. Extract and highlight the key findings, facts, or data points from these results.\n"
 "3. Organize the summarized information in a coherent and logical manner.\n"
-"4. Ensure the summary is concise and directly addresses the query, avoiding extraneous details.\n"  
-"5. If the information from web search is useless, directly answer: \"No useful information from WebSearch\".\n"  
+"4. Ensure the summary is concise and directly addresses the query, avoiding extraneous details.\n"
+"5. If the information from web search is useless, directly answer: \"No useful information from WebSearch\".\n"
         )
 
 
@@ -203,15 +200,6 @@ f"## 💡 Your Previous Answer:\n---\n{answer}\n---\n\n"
     def get_self_consistency(question: str, answers: list, constraint: str) -> str:
         formatted_answers = "\n".join([f"Answer {index + 1}: {answer}" for index, answer in enumerate(answers)])
         return (
-            # "# Self-Consistency Evaluation Task\n\n"
-            # f"## 🤔 Given Question:\n---\n{question}\n---\n\n"
-            # "## 💡 Available Answers:\n---\n"
-            # f"{formatted_answers}\n"
-            # "---\n\n"
-            # "## ✏️ Instructions:\n"
-            # "Review the given answers and choose the most consistent one. "
-            # "If all answers differ, select the one you find most reliable. "
-            # f"Please keep following the constraints to answer the question: {constraint}."
 "# Self-Consistency Evaluation Task\n\n"
 f"## 🤔 Question for Review:\n---\n{question}\n---\n\n"
 f"## 💡 Reviewable Answers:\n---\n{formatted_answers}\n---\n\n"
@@ -229,15 +217,6 @@ f"6. Adhere to the constraints: {constraint}.\n"
     def get_select_best(question: str, answers: list, constraint: str) -> str:
         formatted_answers = "\n".join([f"Answer {index + 1}: {answer}" for index, answer in enumerate(answers)])
         return (
-            # "# Best Answer Evaluation Task\n\n"
-            # f"## 🤔 Given Question:\n---\n{question}\n---\n\n"
-            # "## 💡 Available Answers:\n---\n"
-            # f"{formatted_answers}\n"
-            # "---\n\n"
-            # "## ✏️ Instructions:\n"
-            # "Review the given question and candidate answers and choose the most reasonable one. "
-            # "Please copy the original answer if you decide."
-            # f"Please keep following the constraints to answer the question: {constraint}."
 "# Best Answer Evaluation Task\n\n"
 f"## 🤔 Question:\n---\n{question}\n---\n\n"
 f"## 💡 Candidate Answers for Evaluation:\n---\n{formatted_answers}\n---\n\n"
@@ -258,13 +237,13 @@ f"6. Adhere to the constraints: {constraint}.\n"
     @staticmethod
     def get_decision_constraint():
         return (
-"You will be given a function signature and its docstring by the user."
-"You may be given the overall code design, algorithm framework, code implementation or test problems."
-"Write your full implementation (restate the function signature). "
-"If the prompt given to you contains code that passed internal testing, you can choose the most reliable reply."
-"If there is no code that has passed internal testing in the prompt, you can change it yourself according to the prompt."
-"Use a Python code block to write your response. For example:\n```python\nprint('Hello world!')\n```"
-"Do not include anything other than Python code blocks in your response"
+"You will be given a function signature and its docstring by the user.\n"
+"You may be given the overall code design, algorithm framework, code implementation or test problems.\n"
+"Write your full implementation (restate the function signature).\n"
+"If the prompt given to you contains code that passed internal testing, you can choose the most reliable reply.\n"
+"If there is no code that has passed internal testing in the prompt, you can change it yourself according to the prompt.\n"
+"Use a Python code block to write your response. For example:\n```python\nprint('Hello world!')\n```\n"
+"Do not include anything other than Python code blocks in your response.\n"
 )
     
     @staticmethod
