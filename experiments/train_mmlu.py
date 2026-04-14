@@ -23,7 +23,7 @@ async def train(graph:Graph,
             perm = np.random.permutation(len(dataset))
             while True:
                 for idx in perm:
-                    record = dataset[idx.item()]
+                    record = dataset[idx]
                     yield record
     
     loader = infinite_data_loader()
