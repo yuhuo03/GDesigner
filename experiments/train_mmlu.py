@@ -17,10 +17,13 @@ async def train(graph:Graph,
             num_rounds:int=1,
             lr:float=0.1,
             batch_size:int = 4,
+            train_limit:int = 40,
+            sample_times:int = 10,
           ) -> None:
     
     def infinite_data_loader() -> Iterator[pd.DataFrame]:
-            perm = np.random.permutation(len(dataset))
+            data_size = min(len(dataset), train_limit) if train_limit is not None else len(dataset)
+            perm = np.random.permutation(data_size)
             while True:
                 for idx in perm:
                     record = dataset[idx]
@@ -28,31 +31,38 @@ async def train(graph:Graph,
     
     loader = infinite_data_loader()
     
-    optimizer = torch.optim.Adam(graph.gcn.parameters(), lr=lr)    
-    graph.gcn.train()
+    trainable_params = graph.topology_parameters()
+    if not trainable_params:
+        raise ValueError("No trainable topology parameters were selected.")
+    optimizer = torch.optim.Adam(trainable_params, lr=lr)
+    graph.set_edge_sampling(False)
+    graph.set_topology_train(True)
     for i_iter in range(num_iters):
         print(f"Iter {i_iter}", 80*'-')
         start_ts = time.time()
         correct_answers = []
         answer_log_probs = []
+        realized_graphs = []
 
         for i_record, record in zip(range(batch_size), loader):
-            realized_graph = copy.deepcopy(graph)
-            realized_graph.gcn = graph.gcn
-            realized_graph.mlp = graph.mlp
             input_dict = dataset.record_to_input(record)
             print(input_dict)
-            answer_log_probs.append(asyncio.create_task(realized_graph.arun(input_dict,num_rounds)))
             correct_answer = dataset.record_to_target_answer(record)
-            correct_answers.append(correct_answer)
-        
+            for _ in range(sample_times):
+                realized_graph = copy.deepcopy(graph)
+                realized_graph.share_parameters_from(graph)
+                realized_graphs.append(realized_graph)
+                answer_log_probs.append(asyncio.create_task(realized_graph.arun(input_dict,num_rounds)))
+                correct_answers.append(correct_answer)
+
         raw_results = await asyncio.gather(*answer_log_probs)
         raw_answers, log_probs = zip(*raw_results)
         loss_list: List[torch.Tensor] = []
         utilities: List[float] = []
         answers: List[str] = []
+        regularization_losses: List[float] = []
         
-        for raw_answer, log_prob, correct_answer in zip(raw_answers, log_probs, correct_answers):
+        for raw_answer, log_prob, correct_answer, realized_graph in zip(raw_answers, log_probs, correct_answers, realized_graphs):
             answer = dataset.postprocess_answer(raw_answer)
             answers.append(answer)
             assert isinstance(correct_answer, str), \
@@ -61,7 +71,9 @@ async def train(graph:Graph,
             accuracy.update(answer, correct_answer)
             utility = accuracy.get()
             utilities.append(utility)
-            single_loss = - log_prob * utility
+            regularization_loss = getattr(realized_graph, "topology_regularization_loss", torch.tensor(0.0))
+            regularization_losses.append(float(regularization_loss.detach().cpu()))
+            single_loss = - log_prob * utility + regularization_loss
             loss_list.append(single_loss)
             print(f"correct answer:{correct_answer}")
     
@@ -74,8 +86,8 @@ async def train(graph:Graph,
         print("answers:",answers)
         print(f"Batch time {time.time() - start_ts:.3f}")
         print("utilities:", utilities) # [0.0, 0.0, 0.0, 1.0]
+        print("regularization_losses:", regularization_losses)
         print("loss:", total_loss.item()) # 4.6237263679504395
         print(f"Cost {Cost.instance().value}")
         print(f"PromptTokens {PromptTokens.instance().value}")
         print(f"CompletionTokens {CompletionTokens.instance().value}")
-        

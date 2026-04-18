@@ -22,10 +22,10 @@ from GDesigner.utils.globals import Time
 def parse_args():
     parser = argparse.ArgumentParser(description="Process some parameters.")
 
-    parser.add_argument('--mode', type=str, default='FullConnected',
+    parser.add_argument('--mode', type=str, default='Chain',
                         choices=['DirectAnswer', 'FullConnected', 'Random', 'Chain', 'Debate', 'Layered','Star', 'Mesh',
                                  'FakeFullConnected','FakeRandom','FakeChain','FakeStar','FakeMesh','FakeAGRandom','FakeAGFull'],
-                        help="Mode of operation. Default is 'FullConnected'.")
+                        help="Mode of operation. Default is 'Chain'.")
     parser.add_argument('--lr', type=float, default=0.1,
                         help="learning rate")
     parser.add_argument('--batch_size', type=int, default=4,
@@ -38,7 +38,7 @@ def parse_args():
                         help="Number of optimization iterations. Default 10.")
     parser.add_argument('--imp_per_iterations', type=int, default=5,
                         help="Prune every few iterations. Default 5.")
-    parser.add_argument('--num_rounds',type=int,default=1,
+    parser.add_argument('--num_rounds',type=int,default=3,
                         help="Number of optimization/inference rounds for one query")
     parser.add_argument('--pruning_rate', type=float, default=0.25,
                         help="The Rate of Pruning. Default 0.05.")
@@ -50,6 +50,20 @@ def parse_args():
                         help="the decision method of the final node")
     parser.add_argument('--optimized_spatial',action='store_true')
     parser.add_argument('--optimized_temporal',action='store_true')
+    parser.add_argument('--train_limit', type=int, default=40,
+                        help="Number of MMLU dev examples used for topology optimization. Default 40.")
+    parser.add_argument('--sample_times', type=int, default=10,
+                        help="Topology samples per training query. Default 10.")
+    parser.add_argument('--tau', type=float, default=1e-2,
+                        help="Sampling temperature for learned spatial topology.")
+    parser.add_argument('--zeta', type=float, default=1e-1,
+                        help="Weight for the low-rank sparsity regularizer.")
+    parser.add_argument('--limit_questions', type=int, default=153,
+                        help="Limit number of validation questions. Default 153 matches the paper's MMLU test count.")
+    parser.add_argument('--eval_edge_threshold', type=float, default=0.5,
+                        help="Deterministic edge threshold used during evaluation.")
+    parser.add_argument('--temperature', type=float, default=1.0,
+                        help="LLM temperature for MMLU multi-agent runs. Default 1.0.")
     args = parser.parse_args()
     result_path = GDesigner_ROOT / "result"
     os.makedirs(result_path, exist_ok=True)
@@ -60,12 +74,14 @@ def parse_args():
 
 async def main():
     args = parse_args()
+    if args.optimized_temporal and not args.optimized_spatial:
+        print("MMLU topology optimization learns spatial edges; enabling --optimized_spatial because --optimized_temporal was set.")
+        args.optimized_spatial = True
     
     mode = args.mode
     decision_method = args.decision_method
     agent_names = [name for name,num in zip(args.agent_names,args.agent_nums) for _ in range(num)]
     kwargs = get_kwargs(mode,len(agent_names))
-    limit_questions = 153
     
     graph = Graph(domain=args.domain,
                   llm_name=args.llm_name,
@@ -73,6 +89,12 @@ async def main():
                   decision_method=decision_method,
                   optimized_spatial=args.optimized_spatial,
                   optimized_temporal=args.optimized_temporal,
+                  tau=args.tau,
+                  zeta=args.zeta,
+                  train_limit=args.train_limit,
+                  sample_times=args.sample_times,
+                  eval_edge_threshold=args.eval_edge_threshold,
+                  llm_temperature=args.temperature,
                   **kwargs)
     current_time = Time.instance().value or time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
     Time.instance().value = current_time
@@ -86,14 +108,14 @@ async def main():
     
     if args.optimized_spatial or args.optimized_temporal:
         await train(graph=graph,dataset=dataset_train,num_iters=args.num_iterations,num_rounds=args.num_rounds,
-                    lr=args.lr,batch_size=args.batch_size)
+                    lr=args.lr,batch_size=args.batch_size,train_limit=args.train_limit,sample_times=args.sample_times)
         
     
     score = await evaluate(
         graph=graph,
         dataset=dataset_val,
         num_rounds=args.num_rounds,
-        limit_questions=limit_questions,
+        limit_questions=args.limit_questions,
         eval_batch_size=args.batch_size,
         result_file=result_file,
     )

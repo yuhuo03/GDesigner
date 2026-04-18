@@ -152,13 +152,13 @@ class MMLUPromptSet(PromptSet):
     
     @staticmethod
     def get_analyze_constraint(role):
-        return ROLE_DESCRIPTION[role] if role in ROLE_DESCRIPTION.keys() else ""+ """
+        role_description = ROLE_DESCRIPTION[role] if role in ROLE_DESCRIPTION.keys() else ""
+        return role_description + """
 I will ask you a question and 4 answers enumerated as A, B, C and D.
 Only one answer out of the offered 4 is correct.
-Using the reasoning from other agents as additional advice with critical thinking, can you give an updated answer?
-You are strictly prohibited from imitating the analysis process of other agents
+Using the reasoning from other agents as additional advice with critical thinking, give your updated answer.
 Your reply must be less than 100 words but include your answer and a brief step by step analysis of the question.
-The first line of your reply must contain only one letter(for example : A, B, C or D)
+The first line of your reply must contain only one letter: A, B, C, or D.
 """
     
     @staticmethod

@@ -31,7 +31,8 @@ async def evaluate(
 
     print(f"Evaluating gdesigner on {dataset.__class__.__name__} split {dataset.split}")
     
-    graph.gcn.eval()
+    graph.set_topology_train(False)
+    graph.set_edge_sampling(True)
     accuracy = Accuracy()
     total_correct = 0
     total_executed = 0
@@ -63,8 +64,7 @@ async def evaluate(
         
         for record in record_batch:
             realized_graph = copy.deepcopy(graph)
-            realized_graph.gcn = graph.gcn
-            realized_graph.mlp = graph.mlp
+            realized_graph.share_parameters_from(graph)
             realized_graphs.append(realized_graph)
             input_dict = dataset.record_to_input(record)
             # print(input_dict)

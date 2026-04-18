@@ -22,7 +22,10 @@ MINE_API_KEYS = os.getenv('API_KEY')
 @retry(wait=wait_random_exponential(max=100), stop=stop_after_attempt(3))
 async def achat(
     model: str,
-    msg: List[Dict],):
+    msg: List[Dict],
+    max_tokens: Optional[int] = None,
+    temperature: Optional[float] = None,
+    num_comps: Optional[int] = None,):
     base = MINE_BASE_URL.rstrip('/')
     if base.endswith('/v1'):
         request_url = base + "/chat/completions"
@@ -37,14 +40,25 @@ async def achat(
         "model": model,
         "messages": msg,
     }
+    if max_tokens is not None:
+        data["max_tokens"] = max_tokens
+    if temperature is not None:
+        data["temperature"] = temperature
+    if num_comps is not None:
+        data["n"] = num_comps
     async with aiohttp.ClientSession() as session:
         async with session.post(request_url, headers=headers, json=data) as response:
             response_data = await response.json()
             if 'error' in response_data:
                 raise Exception(f"API error {response.status}: {response_data['error']}")
-            content = response_data['choices'][0]['message']['content']
+            if num_comps and num_comps > 1:
+                content = [choice['message']['content'] for choice in response_data['choices']]
+                completion_text = "".join(content)
+            else:
+                content = response_data['choices'][0]['message']['content']
+                completion_text = content
             prompt_text = "".join(item.get('content', '') for item in msg)
-            cost_count(prompt_text, content, model)
+            cost_count(prompt_text, completion_text, model)
             return content
 
 
@@ -71,7 +85,7 @@ class GPTChat(LLM):
         
         if isinstance(messages, str):
             messages = [Message(role="user", content=messages)]
-        return await achat(self.model_name,messages)
+        return await achat(self.model_name,messages,max_tokens=max_tokens,temperature=temperature,num_comps=num_comps)
     
     def gen(
         self,

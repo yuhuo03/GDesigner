@@ -56,7 +56,7 @@ class AnalyzeAgent(Node):
         """ Use the processed input to get the result """
         system_prompt, user_prompt = await self._process_inputs(input, spatial_info, temporal_info)
         message = [{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}]
-        response = await self.llm.agen(message)
+        response = await self.llm.agen(message, temperature=getattr(self, "llm_temperature", None))
         if self.wiki_summary != "":
             response += f"\n\n{self.wiki_summary}"
             self.wiki_summary = ""
