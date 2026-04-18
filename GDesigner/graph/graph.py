@@ -4,7 +4,6 @@ from abc import ABC
 import numpy as np
 import torch
 import asyncio
-import torch.nn.functional as F
 
 from GDesigner.graph.node import Node
 from GDesigner.agents.agent_registry import AgentRegistry
@@ -295,8 +294,8 @@ class Graph(ABC):
         candidate_adj = self.spatial_masks.view(self.num_nodes, self.num_nodes).to(device=device, dtype=refined_scores.dtype)
         refined_scores = refined_scores * candidate_adj
         sketch_probs = sketch_probs * candidate_adj
-        self.sketch_loss = 0.5 * F.mse_loss(refined_scores, sketch_probs)
-        self.anchor_loss = 0.5 * F.mse_loss(refined_scores, anchor_adj)
+        self.sketch_loss = 0.5 * torch.linalg.matrix_norm(refined_scores - sketch_probs, ord="fro").pow(2)
+        self.anchor_loss = 0.5 * torch.linalg.matrix_norm(refined_scores - anchor_adj, ord="fro").pow(2)
         self.sparsity_loss = torch.linalg.matrix_norm(self.low_rank_weight, ord="nuc")
         self.topology_regularization_loss = self.sketch_loss + self.anchor_loss + self.sparsity_weight * self.sparsity_loss
         return torch.flatten(refined_scores)
