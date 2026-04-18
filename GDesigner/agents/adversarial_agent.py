@@ -52,4 +52,6 @@ class AdverarialAgent(Node):
         system_prompt, user_prompt = await self._process_inputs(input, spatial_info, temporal_info)
         message = [{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}]
         response = await self.llm.agen(message)
+        self.record_execution(system_prompt, user_prompt, response, spatial_info, temporal_info)
+        self.print_agent_io(system_prompt, user_prompt, response)
         return response

@@ -59,7 +59,5 @@ class MathSolver(Node):
             answer = execute_code_get_return(response.lstrip("```python\n").rstrip("\n```"))
             response += f"\nthe answer is {answer}"
         self.record_execution(system_prompt, user_prompt, response, spatial_info, temporal_info)
-        print(f"#################system_prompt:{system_prompt}")
-        print(f"#################user_prompt:{user_prompt}")
-        print(f"#################response:{response}")
+        self.print_agent_io(system_prompt, user_prompt, response)
         return response

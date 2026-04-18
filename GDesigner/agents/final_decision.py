@@ -31,9 +31,10 @@ class FinalWriteCode(Node):
     def _process_inputs(self, raw_inputs:Dict[str,str], spatial_info:Dict[str,Any], temporal_info:Dict[str,Any], **kwargs)->List[Any]:
         """ To be overriden by the descendant class """
         """ Process the raw_inputs(most of the time is a List[Dict]) """
-        self.role = self.prompt_set.get_decision_role()
+        decision_role = self.prompt_set.get_decision_role()
+        self.role = "Decision Maker"
         self.constraint = self.prompt_set.get_decision_constraint()          
-        system_prompt = f"{self.role}.\n {self.constraint}"
+        system_prompt = f"{decision_role}.\n {self.constraint}"
         spatial_str = ""
         for id, info in spatial_info.items():
             if info['output'].startswith("```python") and info['output'].endswith("```"):  # is python code
@@ -63,6 +64,7 @@ class FinalWriteCode(Node):
         message = [{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}]
         response = await self.llm.agen(message, temperature=getattr(self, "llm_temperature", None))
         self.record_execution(system_prompt, user_prompt, response, spatial_info, temporal_info)
+        self.print_agent_io(system_prompt, user_prompt, response)
         return response
 
 
@@ -76,9 +78,10 @@ class FinalRefer(Node):
     def _process_inputs(self, raw_inputs:Dict[str,str], spatial_info:Dict[str,Any], temporal_info:Dict[str,Any], **kwargs)->List[Any]:
         """ To be overriden by the descendant class """
         """ Process the raw_inputs(most of the time is a List[Dict]) """
-        self.role = self.prompt_set.get_decision_role()
+        decision_role = self.prompt_set.get_decision_role()
+        self.role = "Decision Maker"
         self.constraint = self.prompt_set.get_decision_constraint()          
-        system_prompt = f"{self.role}.\n {self.constraint}"
+        system_prompt = f"{decision_role}.\n {self.constraint}"
         
         spatial_str = ""
         for id, info in spatial_info.items():
@@ -104,9 +107,7 @@ class FinalRefer(Node):
         message = [{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}]
         response = await self.llm.agen(message, temperature=getattr(self, "llm_temperature", None))
         self.record_execution(system_prompt, user_prompt, response, spatial_info, temporal_info)
-        print(f"################system prompt:{system_prompt}")
-        print(f"################user prompt:{user_prompt}")
-        print(f"################response:{response}")
+        self.print_agent_io(system_prompt, user_prompt, response)
         return response
 
 @AgentRegistry.register('FinalDirect')
@@ -181,7 +182,6 @@ class FinalMajorVote(Node):
         max_output_num = 0
         for info in spatial_info.values():
             processed_output = self.prompt_set.postprocess_answer(info['output'])
-            print(processed_output)
             if processed_output in output_num:
                 output_num[processed_output] += 1
             else:
