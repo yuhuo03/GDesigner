@@ -45,6 +45,7 @@ class MathSolver(Node):
         system_prompt, user_prompt = self._process_inputs(input, spatial_info, temporal_info)
         message = [{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}]
         response = self.llm.gen(message)
+        self.record_execution(system_prompt, user_prompt, response, spatial_info, temporal_info)
         return response
 
     async def _async_execute(self, input:Dict[str,str],  spatial_info:Dict[str,Any], temporal_info:Dict[str,Any],**kwargs):
@@ -57,6 +58,7 @@ class MathSolver(Node):
         if self.role == "Programming Expert":
             answer = execute_code_get_return(response.lstrip("```python\n").rstrip("\n```"))
             response += f"\nthe answer is {answer}"
+        self.record_execution(system_prompt, user_prompt, response, spatial_info, temporal_info)
         print(f"#################system_prompt:{system_prompt}")
         print(f"#################user_prompt:{user_prompt}")
         print(f"#################response:{response}")

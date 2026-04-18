@@ -10,6 +10,7 @@
 .pyc
 
 .env
+.codex
 experiments.md
 agent5_token.md
 test.py
