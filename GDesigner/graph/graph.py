@@ -271,6 +271,73 @@ class Graph(ABC):
                     
         return torch.sum(torch.stack(log_probs))
 
+    def _debug_node_label(self, node: Node) -> str:
+        return f"{node.id}({node.role})"
+
+    def _debug_topology_snapshot(self, round: int):
+        nodes = [
+            {
+                "node_id": node_id,
+                "role": node.role,
+                "node_type": node.node_name,
+            }
+            for node_id, node in self.nodes.items()
+        ]
+
+        spatial_edges = []
+        for node in self.nodes.values():
+            for successor in node.spatial_successors:
+                if successor.id in self.nodes:
+                    spatial_edges.append({
+                        "source_id": node.id,
+                        "source_role": node.role,
+                        "target_id": successor.id,
+                        "target_role": successor.role,
+                    })
+
+        temporal_edges = []
+        for node in self.nodes.values():
+            for successor in node.temporal_successors:
+                if successor.id in self.nodes:
+                    temporal_edges.append({
+                        "source_id": node.id,
+                        "source_role": node.role,
+                        "target_id": successor.id,
+                        "target_role": successor.role,
+                    })
+
+        return {
+            "round": round + 1,
+            "nodes": nodes,
+            "spatial_edges": spatial_edges,
+            "temporal_edges": temporal_edges,
+        }
+
+    def _debug_print_topology(self, round: int, num_rounds: int):
+        topology = self._debug_topology_snapshot(round)
+        print("# Topology Nodes:")
+        for node in topology["nodes"]:
+            print(f"#   {node['node_id']}: role={node['role']}, type={node['node_type']}")
+
+        print("# Spatial Edges:")
+        if topology["spatial_edges"]:
+            for edge in topology["spatial_edges"]:
+                print(f"#   {edge['source_id']}({edge['source_role']}) -> {edge['target_id']}({edge['target_role']})")
+        else:
+            print("#   <none>")
+
+        should_print_temporal = num_rounds > 1 or bool(topology["temporal_edges"])
+        if should_print_temporal:
+            print(f"# Temporal Edges:")
+            if topology["temporal_edges"]:
+                for edge in topology["temporal_edges"]:
+                    print(f"#   {edge['source_id']}({edge['source_role']}) -> {edge['target_id']}({edge['target_role']})")
+            elif round == 0:
+                print("#   <none in first round>")
+            else:
+                print("#   <none>")
+        return topology
+
 
     def run(self, inputs: Any, 
                   num_rounds:int = 3, 
@@ -318,25 +385,55 @@ class Graph(ABC):
                   max_time: int = 600,) -> List[Any]:
         # inputs:{'task':"xxx"}
         log_probs = 0
+        self.execution_trace = {"rounds": [], "final_decision": None}
+        for node in self.nodes.values():
+            node.execution_trace = []
+        self.decision_node.execution_trace = []
+
         new_features = self.construct_new_features(input['task'])
         logits = self.gcn(new_features,self.role_adj_matrix)
         logits = self.mlp(logits)
         self.spatial_logits = logits @ logits.t()
         self.spatial_logits = min_max_norm(torch.flatten(self.spatial_logits))
 
+        print(f"\n{'#'*80}")
+        print(f"# NEW TASK STARTED")
+        print(f"# Task: {input['task']}")
+        print(f"# Num Agents: {len(self.nodes)}")
+        print(f"# Rounds: {num_rounds}")
+        print(f"# Optimized Spatial: {self.optimized_spatial}")
+        print(f"# Spatial Logits Range: [{self.spatial_logits.min():.3f}, {self.spatial_logits.max():.3f}]")
+        print(f"{'#'*80}\n")
+
         for round in range(num_rounds):
+            print(f"\n{'='*80}")
+            print(f"# ROUND {round + 1}/{num_rounds}")
+            print(f"{'='*80}")
             log_probs += self.construct_spatial_connection()
             log_probs += self.construct_temporal_connection(round)
+            topology = self._debug_print_topology(round, num_rounds)
             
             in_degree = {node_id: len(node.spatial_predecessors) for node_id, node in self.nodes.items()}
             zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0]
 
+            round_trace = {
+                "round": round + 1,
+                "topology": topology,
+                "agent_executions": [],
+                "executed_order": [],
+            }
+            executed_order = []
             while zero_in_degree_queue:
                 current_node_id = zero_in_degree_queue.pop(0)
+                current_node = self.nodes[current_node_id]
+                executed_order.append(self._debug_node_label(current_node))
+                print(f"\n>> [Executing Node] ID: {current_node_id}, Role: {current_node.role}, Type: {current_node.node_name}")
                 tries = 0
                 while tries < max_tries:
                     try:
-                        await asyncio.wait_for(self.nodes[current_node_id].async_execute(input),timeout=max_time) # output is saved in the node.outputs
+                        await asyncio.wait_for(current_node.async_execute(input),timeout=max_time) # output is saved in the node.outputs
+                        if current_node.execution_trace:
+                            round_trace["agent_executions"].append(current_node.execution_trace[-1])
                         break
                     except Exception as e:
                         print(f"Error during execution of node {current_node_id}: {e}")
@@ -347,11 +444,16 @@ class Graph(ABC):
                     in_degree[successor.id] -= 1
                     if in_degree[successor.id] == 0:
                         zero_in_degree_queue.append(successor.id)
+            print(f"# Executed Order: {' -> '.join(executed_order) if executed_order else '<none>'}")
+            round_trace["executed_order"] = executed_order
+            self.execution_trace["rounds"].append(round_trace)
             
             self.update_memory()
             
         self.connect_decision_node()
         await self.decision_node.async_execute(input)
+        if self.decision_node.execution_trace:
+            self.execution_trace["final_decision"] = self.decision_node.execution_trace[-1]
         final_answers = self.decision_node.outputs
         if len(final_answers) == 0:
             final_answers.append("No answer of the decision node")

@@ -62,6 +62,7 @@ class FinalWriteCode(Node):
         system_prompt, user_prompt = self._process_inputs(input, spatial_info, temporal_info)
         message = [{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}]
         response = await self.llm.agen(message)
+        self.record_execution(system_prompt, user_prompt, response, spatial_info, temporal_info)
         return response
 
 
@@ -102,6 +103,7 @@ class FinalRefer(Node):
         system_prompt, user_prompt = self._process_inputs(input, spatial_info, temporal_info)
         message = [{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}]
         response = await self.llm.agen(message)
+        self.record_execution(system_prompt, user_prompt, response, spatial_info, temporal_info)
         print(f"################system prompt:{system_prompt}")
         print(f"################user prompt:{user_prompt}")
         print(f"################response:{response}")

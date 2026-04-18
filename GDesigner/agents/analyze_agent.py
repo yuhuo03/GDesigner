@@ -60,7 +60,20 @@ class AnalyzeAgent(Node):
         if self.wiki_summary != "":
             response += f"\n\n{self.wiki_summary}"
             self.wiki_summary = ""
-        print(f"################system prompt:{system_prompt}")
-        print(f"################user prompt:{user_prompt}")
-        print(f"################response:{response}")
+        self.record_execution(system_prompt, user_prompt, response, spatial_info, temporal_info)
+        print(f"\n{'='*80}")
+        print(f"[Agent] ID: {self.id}")
+        print(f"[Agent] Role: {self.role}")
+        print(f"[Agent] Domain: {self.domain}")
+        print(f"{'='*80}")
+        print(f"################System Prompt################\n")
+        print(system_prompt)
+        print(f"################End System Prompt################\n")
+        print(f"################User Prompt################\n")
+        print(user_prompt)
+        print(f"################End User Prompt################\n")
+        print(f"################Response################\n")
+        print(response)
+        print(f"################End Response################\n")
+        print(f"{'='*80}\n")
         return response

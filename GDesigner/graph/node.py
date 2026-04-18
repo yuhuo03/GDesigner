@@ -62,6 +62,7 @@ class Node(ABC):
         self.raw_inputs: List[Any] = []
         self.role = ""
         self.last_memory: Dict[str,List[Any]] = {'inputs':[],'outputs':[],'raw_inputs':[]}        
+        self.execution_trace: List[Dict[str, Any]] = []
 
     @property
     def node_name(self):
@@ -140,6 +141,34 @@ class Node(ABC):
                 temporal_info[predecessor.id] = {"role":predecessor.role,"output":predecessor_output}
         
         return temporal_info
+
+    def record_execution(self,
+                         system_prompt: Any,
+                         user_prompt: Any,
+                         response: Any,
+                         spatial_info: Dict[str, Any],
+                         temporal_info: Dict[str, Any]) -> None:
+        def serialize_info(info: Dict[str, Any]) -> List[Dict[str, Any]]:
+            return [
+                {
+                    "node_id": node_id,
+                    "role": node_info.get("role", ""),
+                    "output": node_info.get("output", ""),
+                }
+                for node_id, node_info in info.items()
+            ]
+
+        self.execution_trace.append({
+            "node_id": self.id,
+            "node_type": self.node_name,
+            "role": self.role,
+            "domain": self.domain,
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "response": response,
+            "spatial_inputs": serialize_info(spatial_info),
+            "temporal_inputs": serialize_info(temporal_info),
+        })
     
     def execute(self, input:Any, **kwargs):
         self.outputs = []

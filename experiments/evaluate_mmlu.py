@@ -59,18 +59,21 @@ async def evaluate(
 
         start_ts = time.time()
         answer_log_probs = []
+        realized_graphs = []
         
         for record in record_batch:
             realized_graph = copy.deepcopy(graph)
             realized_graph.gcn = graph.gcn
             realized_graph.mlp = graph.mlp
+            realized_graphs.append(realized_graph)
             input_dict = dataset.record_to_input(record)
             # print(input_dict)
             answer_log_probs.append(asyncio.create_task(realized_graph.arun(input_dict,num_rounds)))
         raw_results = await asyncio.gather(*answer_log_probs)
         raw_answers = [r[0] for r in raw_results]
+        execution_traces = [getattr(realized_graph, "execution_trace", None) for realized_graph in realized_graphs]
         print(f"Batch time {time.time() - start_ts:.3f}")
-        for raw_answer, record in zip(raw_answers, record_batch):
+        for raw_answer, record, execution_trace in zip(raw_answers, record_batch, execution_traces):
             print("Raw answer:", raw_answer)
             answer = dataset.postprocess_answer(raw_answer)
             print("Postprocessed answer:", answer)
@@ -95,6 +98,7 @@ async def evaluate(
                     "Total_Solved": total_correct,
                     "Total_Executed": total_executed,
                     "Accuracy": total_correct / total_executed,
+                    "Execution_Trace": execution_trace,
                 })
         if result_path is not None:
             with open(result_path, "w", encoding="utf-8") as file:
