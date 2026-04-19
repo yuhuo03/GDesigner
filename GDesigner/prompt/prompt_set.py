@@ -89,3 +89,11 @@ class PromptSet(ABC):
     @abstractmethod
     def get_decision_few_shot() ->str:
         """ TODO """
+
+    @staticmethod
+    def get_baseline_constraint(prompt_style: str, role: str | None = None) -> str:
+        raise NotImplementedError("Baseline prompts are not implemented for this domain.")
+
+    @staticmethod
+    def get_baseline_answer_prompt(question, prompt_style: str) -> str:
+        return f"{question}"

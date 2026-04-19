@@ -27,6 +27,8 @@ async def evaluate(
         limit_questions: Optional[int] = None,
         eval_batch_size: int = 4,
         result_file: Optional[Union[str, Path]] = None,
+        method_name: Optional[str] = None,
+        method_config: Optional[Dict[str, Any]] = None,
         ) -> float:
 
     print(f"Evaluating gdesigner on {dataset.__class__.__name__} split {dataset.split}")
@@ -86,6 +88,8 @@ async def evaluate(
             accuracy.print()
             if result_data is not None:
                 result_data.append({
+                    **({"Method": method_name} if method_name is not None else {}),
+                    **({"Method_Config": method_config} if method_config is not None else {}),
                     "Question": record["question"],
                     "Option_A": record["A"],
                     "Option_B": record["B"],
@@ -106,6 +110,11 @@ async def evaluate(
         print(f"Cost {Cost.instance().value}")
         print(f"PromptTokens {PromptTokens.instance().value}")
         print(f"CompletionTokens {CompletionTokens.instance().value}")
+    if total_executed == 0:
+        print("No examples evaluated.")
+        print("Done!")
+        return 0.0
+
     accuracy.print()
     print("Done!")
 

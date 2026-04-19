@@ -134,7 +134,7 @@ class MMLUPromptSet(PromptSet):
     
     @staticmethod
     def get_description(role):
-        return ROLE_DESCRIPTION[role]
+        return ROLE_DESCRIPTION.get(role, role or "")
     
     @staticmethod
     def get_constraint():
@@ -182,6 +182,40 @@ The first line of your reply must contain only one letter: A, B, C, or D.
     @staticmethod
     def get_answer_prompt(question):
         return f"""{question}"""
+
+    @staticmethod
+    def get_baseline_constraint(prompt_style: str, role: str | None = None) -> str:
+        prompt_style = prompt_style.lower()
+        base = """
+I will ask you a multiple-choice question.
+There are 4 answer options enumerated as A, B, C, and D.
+Only one option is correct.
+The first line of your reply must contain only one letter: A, B, C, or D.
+"""
+        if prompt_style == "vanilla":
+            return base + """
+Do not include any analysis.
+"""
+        if prompt_style == "cot":
+            return base + """
+After the first-line answer, give a brief step-by-step analysis.
+Keep the analysis concise.
+"""
+        if prompt_style == "complex_cot":
+            return base + """
+After the first-line answer, reason carefully through the question.
+Compare the answer choices, eliminate incorrect options, and keep the analysis concise.
+"""
+        if prompt_style == "php":
+            return base + """
+After the first-line answer, provide concise progressive hints that justify the answer.
+Start from the key concept, then narrow down the choices, then explain why the selected option is correct.
+"""
+        raise ValueError(f"Unsupported MMLU baseline prompt style: {prompt_style}")
+
+    @staticmethod
+    def get_baseline_answer_prompt(question, prompt_style: str):
+        return f"The task is:\n\n{question}"
 
     @staticmethod
     def get_query_prompt(question):

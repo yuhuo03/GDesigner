@@ -1,4 +1,5 @@
 from GDesigner.agents.analyze_agent import AnalyzeAgent
+from GDesigner.agents.baseline_agent import BaselineAgent
 from GDesigner.agents.code_writing import CodeWriting
 from GDesigner.agents.math_solver import MathSolver
 from GDesigner.agents.adversarial_agent import AdverarialAgent
@@ -6,6 +7,7 @@ from GDesigner.agents.final_decision import FinalRefer,FinalDirect,FinalWriteCod
 from GDesigner.agents.agent_registry import AgentRegistry
 
 __all__ =  ['AnalyzeAgent',
+            'BaselineAgent',
             'CodeWriting',
             'MathSolver',
             'AdverarialAgent',
