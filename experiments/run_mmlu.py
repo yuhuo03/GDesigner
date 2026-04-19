@@ -64,6 +64,8 @@ def parse_args():
                         help="Deterministic edge threshold used during evaluation.")
     parser.add_argument('--temperature', type=float, default=1.0,
                         help="LLM temperature for MMLU multi-agent runs. Default 1.0.")
+    parser.add_argument('--grad_clip', type=float, default=1.0,
+                        help="Max gradient norm for topology optimization. Default 1.0.")
     args = parser.parse_args()
     result_path = GDesigner_ROOT / "result"
     os.makedirs(result_path, exist_ok=True)
@@ -108,7 +110,8 @@ async def main():
     
     if args.optimized_spatial or args.optimized_temporal:
         await train(graph=graph,dataset=dataset_train,num_iters=args.num_iterations,num_rounds=args.num_rounds,
-                    lr=args.lr,batch_size=args.batch_size,train_limit=args.train_limit,sample_times=args.sample_times)
+                    lr=args.lr,batch_size=args.batch_size,train_limit=args.train_limit,
+                    sample_times=args.sample_times,grad_clip=args.grad_clip)
         
     
     score = await evaluate(

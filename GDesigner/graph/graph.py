@@ -282,12 +282,13 @@ class Graph(ABC):
         target_latent = agent_latent.repeat(self.num_nodes, 1)
         edge_inputs = torch.cat([source_latent, target_latent, task_latent], dim=1)
         sketch_logits = self.ffn_d(edge_inputs).view(self.num_nodes, self.num_nodes)
-        sketch_probs = self._concrete_sigmoid(sketch_logits)
+        sketch_probs = torch.nan_to_num(self._concrete_sigmoid(sketch_logits), nan=0.5, posinf=1.0, neginf=0.0)
 
         try:
-            z = torch.linalg.svd(sketch_probs, full_matrices=False).U[:, :self.topology_rank]
+            z = torch.linalg.svd(sketch_probs.detach(), full_matrices=False).U[:, :self.topology_rank]
         except RuntimeError:
             z = torch.eye(self.num_nodes, self.topology_rank, dtype=sketch_probs.dtype, device=sketch_probs.device)
+        z = z.detach()
         refined_scores = z @ self.low_rank_weight @ z.t()
 
         anchor_adj = self.anchor_spatial_masks.view(self.num_nodes, self.num_nodes).to(device=device, dtype=refined_scores.dtype)

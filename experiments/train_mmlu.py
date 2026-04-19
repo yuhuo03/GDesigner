@@ -19,6 +19,7 @@ async def train(graph:Graph,
             batch_size:int = 4,
             train_limit:int = 40,
             sample_times:int = 10,
+            grad_clip: float = 1.0,
           ) -> None:
     
     def infinite_data_loader() -> Iterator[pd.DataFrame]:
@@ -79,7 +80,15 @@ async def train(graph:Graph,
     
         total_loss = torch.mean(torch.stack(loss_list))
         optimizer.zero_grad() 
+        if not torch.isfinite(total_loss):
+            print(f"Skipping optimizer step because loss is not finite: {total_loss.item()}")
+            continue
         total_loss.backward()
+        grad_norm = torch.nn.utils.clip_grad_norm_(trainable_params, grad_clip, error_if_nonfinite=False)
+        if not torch.isfinite(grad_norm):
+            print(f"Skipping optimizer step because gradient norm is not finite: {grad_norm}")
+            optimizer.zero_grad()
+            continue
         optimizer.step()
 
         print("raw_answers:",raw_answers)
