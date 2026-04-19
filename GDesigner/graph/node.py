@@ -63,6 +63,7 @@ class Node(ABC):
         self.role = ""
         self.last_memory: Dict[str,List[Any]] = {'inputs':[],'outputs':[],'raw_inputs':[]}        
         self.execution_trace: List[Dict[str, Any]] = []
+        self.verbose: bool = True
 
     @property
     def node_name(self):
@@ -171,6 +172,8 @@ class Node(ABC):
         })
 
     def print_agent_io(self, system_prompt: Any, user_prompt: Any, response: Any) -> None:
+        if not self.verbose:
+            return
         print(f"\n{'='*80}")
         print(f"[Agent] ID: {self.id}")
         print(f"[Agent] Role: {self.role}")

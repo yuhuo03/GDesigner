@@ -73,6 +73,8 @@ def parse_args():
                         help="LLM temperature for MMLU multi-agent runs. Default 1.0.")
     parser.add_argument('--grad_clip', type=float, default=1.0,
                         help="Max gradient norm for topology optimization. Default 1.0.")
+    parser.add_argument('--quiet', action='store_true',
+                        help="Disable verbose topology and agent prompt/response logging.")
     args = parser.parse_args()
     result_path = GDesigner_ROOT / "result"
     os.makedirs(result_path, exist_ok=True)
@@ -104,6 +106,7 @@ async def main():
                   sample_times=args.sample_times,
                   eval_edge_threshold=args.eval_edge_threshold,
                   llm_temperature=args.temperature,
+                  verbose=not args.quiet,
                   **kwargs)
     current_time = Time.instance().value or time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
     Time.instance().value = current_time

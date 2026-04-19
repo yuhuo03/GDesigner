@@ -144,6 +144,8 @@ class MMLUPromptSet(PromptSet):
             I will also give you 4 answers enumerated as A, B, C and D.
             Only one answer out of the offered 4 is correct.
             You must choose the correct answer to the question.
+            Always select the best available option from A, B, C, and D, even if none seems perfect.
+            Do not answer that none of the options is correct.
             Your response must be one of the 4 letters: A, B, C or D,
             corresponding to the correct answer.
             Your answer can refer to the answers of other agents provided to you.
@@ -157,6 +159,8 @@ class MMLUPromptSet(PromptSet):
         return role_description + """
 I will ask you a question and 4 answers enumerated as A, B, C and D.
 Only one answer out of the offered 4 is correct.
+Always select the best available option from A, B, C, and D, even if none seems perfect.
+Do not answer that none of the options is correct.
 Using the reasoning from other agents as additional advice with critical thinking, give your updated answer.
 Your reply must be less than 100 words but include your answer and a brief step by step analysis of the question.
 The first line of your reply must contain only one letter: A, B, C, or D.
@@ -169,6 +173,8 @@ The first line of your reply must contain only one letter: A, B, C, or D.
         I will also give you 4 answers enumerated as A, B, C and D.
         Only one answer out of the offered 4 is correct.
         You must choose the correct answer to the question.
+        Always select the best available option from A, B, C, and D, even if none seems perfect.
+        Do not answer that none of the options is correct.
         Your response must be one of the 4 letters: A, B, C or D,
         corresponding to the correct answer.
         I will give you some other people's answers and analysis.
@@ -191,26 +197,39 @@ The first line of your reply must contain only one letter: A, B, C, or D.
 I will ask you a multiple-choice question.
 There are 4 answer options enumerated as A, B, C, and D.
 Only one option is correct.
-The first line of your reply must contain only one letter: A, B, C, or D.
+Always select the best available option from A, B, C, and D, even if none seems perfect.
+Do not answer that none of the options is correct.
 """
         if prompt_style == "vanilla":
             return base + """
+Reply with only one letter: A, B, C, or D.
 Do not include any analysis.
 """
         if prompt_style == "cot":
             return base + """
-After the first-line answer, give a brief step-by-step analysis.
-Keep the analysis concise.
+Reason step by step before choosing the answer.
+Use at most 5 short sentences.
+Do not write tables, exhaustive cases, or long derivations.
+Put your final answer on the last line exactly in this format:
+Final answer: X
+where X is one of A, B, C, or D.
 """
         if prompt_style == "complex_cot":
             return base + """
-After the first-line answer, reason carefully through the question.
+Reason carefully through the question before choosing the answer.
 Compare the answer choices, eliminate incorrect options, and keep the analysis concise.
+Put your final answer on the last line exactly in this format:
+Final answer: X
+where X is one of A, B, C, or D.
 """
         if prompt_style == "php":
             return base + """
-After the first-line answer, provide concise progressive hints that justify the answer.
+Provide concise progressive hints before choosing the answer.
 Start from the key concept, then narrow down the choices, then explain why the selected option is correct.
+Use at most 5 short sentences.
+Put your final answer on the last line exactly in this format:
+Final answer: X
+where X is one of A, B, C, or D.
 """
         raise ValueError(f"Unsupported MMLU baseline prompt style: {prompt_style}")
 

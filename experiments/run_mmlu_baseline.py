@@ -63,6 +63,8 @@ def parse_args():
     parser.add_argument("--temperature", type=float, default=None)
     parser.add_argument("--seed", type=int, default=888)
     parser.add_argument("--result_dir", type=str, default=None)
+    parser.add_argument("--quiet", action="store_true",
+                        help="Disable verbose topology and agent prompt/response logging.")
     return parser.parse_args()
 
 
@@ -251,6 +253,7 @@ def build_graph(config: Dict[str, Any], args) -> Graph:
         train_limit=0,
         sample_times=0,
         llm_temperature=config["temperature"],
+        verbose=not args.quiet,
         **kwargs,
     )
 

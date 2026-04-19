@@ -52,6 +52,7 @@ class Graph(ABC):
                 sample_times: int = 10,
                 eval_edge_threshold: float = 0.5,
                 llm_temperature: Optional[float] = None,
+                verbose: bool = True,
                 ):
         
         if fixed_spatial_masks is None:
@@ -79,6 +80,7 @@ class Graph(ABC):
         self.eval_edge_threshold = eval_edge_threshold
         self.deterministic_edges = False
         self.llm_temperature = llm_temperature
+        self.verbose = verbose
         self.decision_node:Node = AgentRegistry.get(decision_method, **{"domain":self.domain,"llm_name":self.llm_name})
         self.nodes:Dict[str,Node] = {}
         self.potential_spatial_edges:List[List[str, str]] = []
@@ -196,6 +198,11 @@ class Graph(ABC):
     def apply_runtime_options(self):
         for node in list(self.nodes.values()) + [self.decision_node]:
             node.llm_temperature = self.llm_temperature
+            node.verbose = self.verbose
+
+    def _log(self, *args, **kwargs):
+        if self.verbose:
+            print(*args, **kwargs)
 
     def share_parameters_from(self, source: "Graph"):
         self.gnn_mu = source.gnn_mu
@@ -431,6 +438,8 @@ class Graph(ABC):
 
     def _debug_print_topology(self, round: int, num_rounds: int):
         topology = self._debug_topology_snapshot(round)
+        if not self.verbose:
+            return topology
         print("# Topology Nodes:")
         for node in topology["nodes"]:
             print(f"#   {node['node_id']}: role={node['role']}, type={node['node_type']}")
@@ -514,19 +523,19 @@ class Graph(ABC):
         spatial_threshold = self.eval_edge_threshold if self.deterministic_edges and self.optimized_spatial else None
         log_probs += self.construct_spatial_connection(threshold=spatial_threshold)
 
-        print(f"\n{'#'*80}")
-        print(f"# NEW TASK STARTED")
-        print(f"# Task: {input['task']}")
-        print(f"# Num Agents: {len(self.nodes)}")
-        print(f"# Rounds: {num_rounds}")
-        print(f"# Optimized Spatial: {self.optimized_spatial}")
-        print(f"# Spatial Logits Range: [{self.spatial_logits.min():.3f}, {self.spatial_logits.max():.3f}]")
-        print(f"{'#'*80}\n")
+        self._log(f"\n{'#'*80}")
+        self._log(f"# NEW TASK STARTED")
+        self._log(f"# Task: {input['task']}")
+        self._log(f"# Num Agents: {len(self.nodes)}")
+        self._log(f"# Rounds: {num_rounds}")
+        self._log(f"# Optimized Spatial: {self.optimized_spatial}")
+        self._log(f"# Spatial Logits Range: [{self.spatial_logits.min():.3f}, {self.spatial_logits.max():.3f}]")
+        self._log(f"{'#'*80}\n")
 
         for round in range(num_rounds):
-            print(f"\n{'='*80}")
-            print(f"# ROUND {round + 1}/{num_rounds}")
-            print(f"{'='*80}")
+            self._log(f"\n{'='*80}")
+            self._log(f"# ROUND {round + 1}/{num_rounds}")
+            self._log(f"{'='*80}")
             temporal_threshold = self.eval_edge_threshold if self.deterministic_edges and self.optimized_temporal else None
             log_probs += self.construct_temporal_connection(round, threshold=temporal_threshold)
             topology = self._debug_print_topology(round, num_rounds)
@@ -545,7 +554,7 @@ class Graph(ABC):
                 current_node_id = zero_in_degree_queue.pop(0)
                 current_node = self.nodes[current_node_id]
                 executed_order.append(self._debug_node_label(current_node))
-                print(f"\n>> [Executing Node] ID: {current_node_id}, Role: {current_node.role}, Type: {current_node.node_name}")
+                self._log(f"\n>> [Executing Node] ID: {current_node_id}, Role: {current_node.role}, Type: {current_node.node_name}")
                 tries = 0
                 while tries < max_tries:
                     try:
@@ -554,7 +563,7 @@ class Graph(ABC):
                             round_trace["agent_executions"].append(current_node.execution_trace[-1])
                         break
                     except Exception as e:
-                        print(f"Error during execution of node {current_node_id}: {e}")
+                        self._log(f"Error during execution of node {current_node_id}: {e}")
                     tries += 1
                 for successor in self.nodes[current_node_id].spatial_successors:
                     if successor.id not in self.nodes.keys():
@@ -562,7 +571,7 @@ class Graph(ABC):
                     in_degree[successor.id] -= 1
                     if in_degree[successor.id] == 0:
                         zero_in_degree_queue.append(successor.id)
-            print(f"# Executed Order: {' -> '.join(executed_order) if executed_order else '<none>'}")
+            self._log(f"# Executed Order: {' -> '.join(executed_order) if executed_order else '<none>'}")
             round_trace["executed_order"] = executed_order
             self.execution_trace["rounds"].append(round_trace)
             
