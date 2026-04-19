@@ -4,6 +4,7 @@ import itertools
 from GDesigner.prompt.prompt_set import PromptSet
 from GDesigner.prompt.prompt_set_registry import PromptSetRegistry
 from GDesigner.prompt.common import get_combine_materials
+from GDesigner.utils.answer_parsing import extract_choice_answer
 
 
 roles = itertools.cycle(['Knowledgeable Expert',
@@ -263,13 +264,4 @@ Start from the key concept, then narrow down the choices, then explain why the s
         return ""
     
     def postprocess_answer(self, answer: Union[str, List[str]]) -> str:
-        if isinstance(answer, list):
-            if len(answer) > 0:
-                answer = answer[0]
-            else:
-                answer = ""
-        if not isinstance(answer, str):
-            raise Exception("Expected string")
-        if len(answer) > 0:
-            answer = answer[0] # Try to format the answer by taking the first letter
-        return answer
+        return extract_choice_answer(answer)

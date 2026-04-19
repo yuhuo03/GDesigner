@@ -14,6 +14,13 @@ from datasets.mmlu_dataset import MMLUDataset
 from datasets.MMLU.download import download
 from experiments.train_mmlu import train
 from experiments.evaluate_mmlu import evaluate
+from experiments.usage_metrics import (
+    reset_usage_metrics,
+    usage_delta,
+    usage_snapshot,
+    write_run_metrics,
+    zero_usage,
+)
 from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.utils.globals import Time
 
@@ -59,7 +66,7 @@ def parse_args():
     parser.add_argument('--zeta', type=float, default=1e-1,
                         help="Weight for the low-rank sparsity regularizer.")
     parser.add_argument('--limit_questions', type=int, default=153,
-                        help="Limit number of validation questions. Default 153 matches the paper's MMLU test count.")
+                        help="Limit number of validation questions. Default 153 matches the configured MMLU test count.")
     parser.add_argument('--eval_edge_threshold', type=float, default=0.5,
                         help="Deterministic edge threshold used during evaluation.")
     parser.add_argument('--temperature', type=float, default=1.0,
@@ -107,13 +114,22 @@ async def main():
     download()
     dataset_train = MMLUDataset('dev')
     dataset_val = MMLUDataset('val')
+
+    reset_usage_metrics()
+    training_usage = zero_usage()
+    training_seconds = 0.0
     
     if args.optimized_spatial or args.optimized_temporal:
+        training_start_usage = usage_snapshot()
+        training_start_ts = time.time()
         await train(graph=graph,dataset=dataset_train,num_iters=args.num_iterations,num_rounds=args.num_rounds,
                     lr=args.lr,batch_size=args.batch_size,train_limit=args.train_limit,
                     sample_times=args.sample_times,grad_clip=args.grad_clip)
+        training_seconds = time.time() - training_start_ts
+        training_usage = usage_delta(training_start_usage)
         
-    
+    inference_start_usage = usage_snapshot()
+    inference_start_ts = time.time()
     score = await evaluate(
         graph=graph,
         dataset=dataset_val,
@@ -121,9 +137,27 @@ async def main():
         limit_questions=args.limit_questions,
         eval_batch_size=args.batch_size,
         result_file=result_file,
+        method_name="GDesigner",
+        method_config=vars(args),
+    )
+    inference_seconds = time.time() - inference_start_ts
+    inference_usage = usage_delta(inference_start_usage)
+    metrics_file = write_run_metrics(
+        result_file,
+        method_name="GDesigner",
+        method_config=vars(args),
+        llm_name=args.llm_name,
+        dataset_name=dataset_val.__class__.__name__,
+        split=dataset_val.split,
+        score=score,
+        training_usage=training_usage,
+        training_seconds=training_seconds,
+        inference_usage=inference_usage,
+        inference_seconds=inference_seconds,
     )
     print(f"Score: {score}")
     print(f"Result file: {result_file}")
+    print(f"Metrics file: {metrics_file}")
 
 
 

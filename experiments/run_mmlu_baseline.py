@@ -19,6 +19,13 @@ from GDesigner.utils.globals import Time
 from datasets.MMLU.download import download
 from datasets.mmlu_dataset import MMLUDataset
 from experiments.evaluate_mmlu import evaluate
+from experiments.usage_metrics import (
+    reset_usage_metrics,
+    usage_delta,
+    usage_snapshot,
+    write_run_metrics,
+    zero_usage,
+)
 
 
 BASELINE_MODES = [
@@ -275,6 +282,9 @@ async def main():
     dataset_val = MMLUDataset("val")
     graph = build_graph(config, args)
 
+    reset_usage_metrics()
+    inference_start_usage = usage_snapshot()
+    inference_start_ts = time.time()
     score = await evaluate(
         graph=graph,
         dataset=dataset_val,
@@ -285,8 +295,24 @@ async def main():
         method_name=args.mode,
         method_config=config,
     )
+    inference_seconds = time.time() - inference_start_ts
+    inference_usage = usage_delta(inference_start_usage)
+    metrics_file = write_run_metrics(
+        result_file,
+        method_name=args.mode,
+        method_config=config,
+        llm_name=args.llm_name,
+        dataset_name=dataset_val.__class__.__name__,
+        split=dataset_val.split,
+        score=score,
+        training_usage=zero_usage(),
+        training_seconds=0.0,
+        inference_usage=inference_usage,
+        inference_seconds=inference_seconds,
+    )
     print(f"Score: {score}")
     print(f"Result file: {result_file}")
+    print(f"Metrics file: {metrics_file}")
 
 
 if __name__ == "__main__":
