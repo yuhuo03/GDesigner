@@ -1,94 +1,189 @@
-import json, re
-from typing import Dict, Any, List
+import json
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Literal, Union
+
+import numpy as np
+
+from GDesigner.utils.answer_parsing import extract_choice_answer
 
 
-def load_aqua(path: str = "datasets/AQuA/AQuA.jsonl") -> list:
-    with open(path) as f:
-        data = [json.loads(line) for line in f if line.strip()]
-    return data
+AQUA_CHOICES = ("A", "B", "C", "D", "E")
+
+
+class AQuADataset:
+    def __init__(
+        self,
+        split: Literal["train", "dev", "test", "val"],
+        data_dir: Union[str, Path] = "datasets/AQuA",
+        seed: int = 888,
+    ) -> None:
+        self._split = "test" if split == "val" else split
+        self.data_dir = Path(data_dir)
+        self.seed = seed
+        self._records = self._load_records()
+
+    @staticmethod
+    def get_domain() -> str:
+        return "aqua"
+
+    @property
+    def split(self) -> str:
+        return self._split
+
+    def __len__(self) -> int:
+        return len(self._records)
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
+
+    def __getitem__(self, index):
+        if isinstance(index, (int, np.integer)):
+            return self._records[int(index)]
+        if isinstance(index, slice):
+            return self._records[index]
+        raise TypeError(f"indices must be int or slice, not {type(index)}")
+
+    def _load_records(self) -> List[Dict[str, Any]]:
+        data_file = self._resolve_data_file()
+        records = aqua_data_process(load_aqua(data_file))
+        if self._split == "train":
+            rng = np.random.default_rng(self.seed)
+            indices = rng.permutation(len(records))
+            records = [records[int(index)] for index in indices]
+        return records
+
+    def _resolve_data_file(self) -> Path:
+        split_files = {
+            "train": "train.json",
+            "dev": "dev.json",
+            "test": "test.json",
+        }
+        if self._split not in split_files:
+            raise ValueError(f"Unsupported AQuA split: {self._split}")
+
+        data_file = self.data_dir / split_files[self._split]
+        if data_file.exists():
+            return data_file
+
+        raise FileNotFoundError(
+            f"Missing AQuA {self._split} split at {data_file}. "
+            "Run `python datasets/AQuA/download.py` to download the full AQuA-RAT splits."
+        )
+
+    @staticmethod
+    def record_to_input(record: Dict[str, Any]) -> Dict[str, Any]:
+        question = record["question"]
+        options_text = "\n".join(record["options"])
+        return {"task": f"{question}\n{options_text}"}
+
+    def postprocess_answer(
+        self,
+        answer: Union[str, List[str]],
+        options: List[str] | None = None,
+    ) -> str:
+        return aqua_postprocess_answer(answer, options=options)
+
+    @staticmethod
+    def record_to_target_answer(record: Dict[str, Any]) -> str:
+        correct_answer = record["correct"]
+        assert correct_answer in AQUA_CHOICES, (
+            f"A-E expected but got {correct_answer} "
+            f"of type {type(correct_answer)} record={record}"
+        )
+        return correct_answer
+
+
+def load_aqua(path: Union[str, Path] = "datasets/AQuA/test.json") -> list:
+    with open(path, encoding="utf-8") as file:
+        return [json.loads(line) for line in file if line.strip()]
 
 
 def aqua_data_process(dataset: list) -> list:
-    """Process AQuA dataset to task dict format."""
     list_data_dict = []
     for item in dataset:
         question = item["question"].strip()
-        options = item["options"]
+        options = [str(option).strip() for option in item["options"]]
         correct = item["correct"].strip()
         list_data_dict.append({
+            "question": question,
             "task": question,
             "options": options,
+            "A": _option_text(options, "A"),
+            "B": _option_text(options, "B"),
+            "C": _option_text(options, "C"),
+            "D": _option_text(options, "D"),
+            "E": _option_text(options, "E"),
             "correct": correct,
             "rationale": item.get("rationale", ""),
         })
     return list_data_dict
 
 
-def aqua_record_to_input(record: Dict) -> Dict[str, Any]:
-    """Format AQuA question into prompt input."""
-    question = record["task"]
-    options = record["options"]
-    options_text = "\n".join(options)
-    demo_question = f"{question}\n{options_text}"
-    return {"task": demo_question}
+def _option_text(options: List[str], letter: str) -> str:
+    prefix = f"{letter})"
+    for option in options:
+        if option.strip().startswith(prefix):
+            return option.strip()[len(prefix):].strip()
+    return ""
 
 
-def aqua_postprocess_answer(answer: str, options: list = None) -> str:
-    """Extract option letter (A-E) from model response.
+def aqua_record_to_input(record: Dict[str, Any]) -> Dict[str, Any]:
+    return AQuADataset.record_to_input(record)
 
-    Strategy:
-    1. "answer is A/B/C/D/E" pattern (standalone letter) → return it.
-    2. Formula matching (most important for AQuA): if options provided,
-       normalize LaTeX vs Unicode and find which option's formula
-       appears in the response.
-    3. Standalone single letter A-E at end of response → return it.
-    """
-    if not answer:
+
+def aqua_postprocess_answer(
+    answer: Union[str, List[str]],
+    options: List[str] | None = None,
+) -> str:
+    if isinstance(answer, list):
+        for item in answer:
+            parsed = aqua_postprocess_answer(item, options=options)
+            if parsed:
+                return parsed
         return ""
-    answer = answer.strip()
-    lower = answer.lower()
 
-    # 1. "answer is A/B/C/D/E" standalone pattern
-    if "answer is" in lower:
-        idx = lower.find("answer is")
-        candidate = answer[idx + len("answer is"):].strip().rstrip(".").strip()
-        if candidate and candidate[0] in "ABCDE" and len(candidate) <= 3:
-            return candidate[0]
+    if not isinstance(answer, str):
+        return ""
 
-    # 2. Formula matching against options (handles LaTeX vs Unicode)
+    parsed = extract_choice_answer(answer, choices=AQUA_CHOICES)
+    if parsed:
+        return parsed
+
     if options:
-        # Normalize answer: collapse whitespace, strip trailing punctuation
-        answer_norm = re.sub(r'\s+', ' ', answer).strip()
-        for opt in options:
-            m = re.match(r'^([A-E])\)(.+)', opt.strip())
-            if not m:
-                continue
-            letter, formula = m.group(1), m.group(2).strip()
-            # Try multiple normalizations of the formula
-            for f in [
-                formula,
-                re.sub(r'\s+', '', formula),                              # no whitespace
-                formula.lower().replace('\u221a', 'sqrt'),                # unicode -> word
-                formula.replace('\u221a', r'\\sqrt\{').replace('}', '}'), # unicode -> latex
-            ]:
-                # Simple substring match (case-insensitive)
-                if f.lower() in answer_norm.lower():
-                    return letter
-                # Regex with escaped special chars
-                fp = re.escape(f)
-                if re.search(fp, answer_norm, re.IGNORECASE):
-                    return letter
-
-    # 3. Standalone single A-E letter at end of response
-    for c in reversed(answer):
-        if c in "ABCDE":
-            return c
-        if c.isalnum():
-            break
+        matched = _match_answer_to_options(answer, options)
+        if matched:
+            return matched
 
     return ""
 
 
-def aqua_record_to_target_answer(record: Dict) -> str:
-    """Return the correct answer letter."""
-    return record["correct"]
+def _match_answer_to_options(answer: str, options: List[str]) -> str:
+    answer_norm = _normalize_option_text(answer)
+    if not answer_norm:
+        return ""
+
+    for option in options:
+        match = re.match(r"^([A-E])\)(.+)", option.strip())
+        if not match:
+            continue
+        letter, value = match.group(1), match.group(2)
+        value_norm = _normalize_option_text(value)
+        if value_norm and (value_norm in answer_norm or answer_norm in value_norm):
+            return letter
+    return ""
+
+
+def _normalize_option_text(text: str) -> str:
+    normalized = text.lower()
+    normalized = normalized.replace("\\", "")
+    normalized = normalized.replace("{", "").replace("}", "")
+    normalized = normalized.replace("√", "sqrt").replace("−", "-").replace("–", "-")
+    normalized = re.sub(r"\s+", "", normalized)
+    normalized = normalized.strip(".,;:()[]")
+    return normalized
+
+
+def aqua_record_to_target_answer(record: Dict[str, Any]) -> str:
+    return AQuADataset.record_to_target_answer(record)

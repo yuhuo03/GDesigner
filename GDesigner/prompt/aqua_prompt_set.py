@@ -8,6 +8,7 @@ import itertools
 from GDesigner.prompt.prompt_set import PromptSet
 from GDesigner.prompt.prompt_set_registry import PromptSetRegistry
 from GDesigner.prompt.common import get_combine_materials
+from GDesigner.utils.answer_parsing import extract_choice_answer
 
 
 roles = itertools.cycle([
@@ -22,18 +23,18 @@ ROLE_DESCRIPTION = {
     "Mathematical Analyst": (
         "You are a mathematical analyst skilled at arithmetic, algebraic reasoning, and logic. "
         "You will be given a multiple-choice math problem with options A-E and analysis from other agents. "
-        "Analyze step by step, then output the letter of the best option. "
+        "Analyze step by step, then output the letter of the best option from A, B, C, D, and E. "
         "The first line of your output must contain only one letter: A, B, C, D, or E."
     ),
     "Math Solver": (
         "You are a math expert. You will be given a multiple-choice math problem with options A-E and hints from other agents. "
-        "Solve step by step, then output the letter of the best option. "
+        "Solve step by step, then output the letter of the best option from A, B, C, D, and E. "
         "The first line of your output must contain only one letter: A, B, C, D, or E."
     ),
     "Programming Expert": (
         "You are a programming expert skilled at Python. "
         "Given a multiple-choice math problem, write code to compute and verify each option, "
-        "then output the letter of the correct choice. "
+        "then output the letter of the correct choice from A, B, C, D, and E. "
         "The first line of your output must contain only one letter: A, B, C, D, or E."
     ),
     "Inspector": (
@@ -142,6 +143,52 @@ class AQUAPromptSet(PromptSet):
         return "{}\n\n---END OF EXAMPLES---\n\nQ:{}".format(shots, question)
 
     @staticmethod
+    def get_baseline_constraint(prompt_style: str, role: str | None = None) -> str:
+        prompt_style = prompt_style.lower()
+        base = """
+I will ask you a multiple-choice math question.
+There are 5 answer options enumerated as A, B, C, D, and E.
+Only one option is correct.
+Always select the best available option from A, B, C, D, and E.
+"""
+        if prompt_style == "vanilla":
+            return base + """
+Reply with only one letter: A, B, C, D, or E.
+Do not include any analysis.
+"""
+        if prompt_style == "cot":
+            return base + """
+Reason step by step before choosing the answer.
+Use at most 5 short sentences.
+Do not write tables, exhaustive cases, or long derivations.
+Put your final answer on the last line exactly in this format:
+Final answer: X
+where X is one of A, B, C, D, or E.
+"""
+        if prompt_style == "complex_cot":
+            return base + """
+Reason carefully through the question before choosing the answer.
+Compare the answer choices, eliminate incorrect options, and keep the analysis concise.
+Put your final answer on the last line exactly in this format:
+Final answer: X
+where X is one of A, B, C, D, or E.
+"""
+        if prompt_style == "php":
+            return base + """
+Provide concise progressive hints before choosing the answer.
+Start from the key equation or concept, then narrow down the choices, then explain why the selected option is correct.
+Use at most 5 short sentences.
+Put your final answer on the last line exactly in this format:
+Final answer: X
+where X is one of A, B, C, D, or E.
+"""
+        raise ValueError(f"Unsupported AQuA baseline prompt style: {prompt_style}")
+
+    @staticmethod
+    def get_baseline_answer_prompt(question, prompt_style: str):
+        return f"The task is:\n\n{question}"
+
+    @staticmethod
     def get_decision_constraint():
         return (
             "You will be given a multiple-choice math problem with options A, B, C, D, and E. "
@@ -203,69 +250,4 @@ f"## Target Question:\n---\n{question}\n---\n\n"
 
     @staticmethod
     def postprocess_answer(answer: Union[str, List[str]], options=None) -> str:
-        """
-        Extract the answer letter (A-E) from model output.
-        If options are provided, also tries formula/value matching against option values.
-        """
-        if isinstance(answer, list):
-            answer = answer[0] if len(answer) > 0 else ""
-        if not isinstance(answer, str):
-            return ""
-
-        answer = answer.strip()
-
-        # 1. Direct letter match on first character
-        first = answer[0].upper() if answer else ""
-        if first in ("A", "B", "C", "D", "E"):
-            return first
-
-        # 2. Try to find a letter (A/B/C/D/E) anywhere in the text
-        import re
-        letters = re.findall(r'\b([A-E])\b', answer, re.IGNORECASE)
-        if letters:
-            return letters[0].upper()
-
-        # 3. If options provided, try formula/value matching
-        if options and isinstance(options, (list, tuple, str)):
-            # Normalize options to list of strings
-            if isinstance(options, str):
-                try:
-                    import json
-                    options = json.loads(options)
-                except Exception:
-                    options = [opt.strip() for opt in options.split(",")]
-
-            answer_lower = answer.lower()
-
-            # Try to find computed values in the response
-            import re
-            numbers = re.findall(r'-?\d+(?:\.\d+)?', answer)
-            for num_str in numbers:
-                try:
-                    val = float(num_str)
-                    for opt in options:
-                        opt_str = str(opt).strip()
-                        try:
-                            opt_val = float(opt_str)
-                            if abs(val - opt_val) < 1e-6:
-                                # find which letter this matches
-                                for i, o in enumerate(options):
-                                    if str(float(o)) == str(opt_val):
-                                        return chr(65 + i)  # A=65
-                        except (ValueError, TypeError):
-                            pass
-                except ValueError:
-                    pass
-
-            # Try direct option value matching
-            for i, opt in enumerate(options):
-                opt_str = str(opt).strip()
-                # Normalize LaTeX/unicode
-                normalized = opt_str.replace("\\", "").replace("{", "").replace("}", "")
-                normalized = normalized.replace("√", "sqrt").replace("−", "-").replace(" ", "")
-                answer_norm = answer_lower.replace("\\", "").replace("{", "").replace("}", "")
-                answer_norm = answer_norm.replace("√", "sqrt").replace("−", "-").replace(" ", "")
-                if normalized in answer_norm or answer_norm in normalized:
-                    return chr(65 + i)
-
-        return ""
+        return extract_choice_answer(answer, choices=("A", "B", "C", "D", "E"))
