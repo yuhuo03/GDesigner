@@ -45,7 +45,7 @@ def parse_args():
                         help="Number of optimization iterations. Default 10.")
     parser.add_argument("--imp_per_iterations", type=int, default=5,
                         help="Kept for CLI compatibility with other experiment runners.")
-    parser.add_argument("--num_rounds", type=int, default=3,
+    parser.add_argument("--num_rounds", type=int, default=1,
                         help="Number of optimization/inference rounds for one query")
     parser.add_argument("--pruning_rate", type=float, default=0.25,
                         help="Kept for CLI compatibility with other experiment runners.")

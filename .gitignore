@@ -6,6 +6,7 @@
 *.log
 *.ipynb
 *.sh
+!experiments/run_mmlu_experiments.sh
 !experiments/run_aqua_experiments.sh
 !experiments/run_humaneval_experiments.sh
 !experiments/run_gsm8k_experiments.sh
