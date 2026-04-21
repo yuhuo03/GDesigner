@@ -2,7 +2,7 @@
 
 ## Overview
 
-We provide the code of our paper. The algorithm implementation code is in `GDesigner` folder, and the experimental code is in `experiments` folder.
+GDesigner provides topology optimization for multi-agent LLM collaboration. Core implementation code is in `GDesigner`, dataset adapters are in `datasets`, and experiment entry points are in `experiments`.
 
 ## Quick Start
 
@@ -21,25 +21,61 @@ BASE_URL = "" # the BASE_URL of OpenAI LLM backend
 API_KEY = "" # for OpenAI LLM backend
 ```
 
-### Download Datasets
+### Prepare Datasets
 
-Download MMLU, HumanEval and GSM8K datasets from MMLU, HumanEval and GSM8K. And put them in different folders.
-
-### Run GDesigner on MMLU by running the following scripts
+The supported datasets are MMLU, AQuA, GSM8K, MultiArith, SVAMP and HumanEval. MMLU and AQuA include download helpers:
 
 ```bash
-python experiments/run_mmlu.py --mode FullConnected --batch_size 4 --agent_nums 6 --num_iterations 10 --num_rounds 1 --optimized_spatial
+python datasets/MMLU/download.py
+python datasets/AQuA/download.py
 ```
 
-The above code verifies the experimental results of the `mmlu` dataset under different topologies.
-
-We also provide experimental code for other datasets and topologies.You can refer to `experiments/run_humaneval.py` and `experiments/run_gsm8k.py`.
-
-For example, if you want to verify the results on the `gsm8k` dataset, you can execute the following command
+Other dataset files are expected under these paths:
 
 ```bash
-python experiments/run_gsm8k.py --mode FullConnected --batch_size 4 --agent_nums 4 --num_iterations 10 --num_rounds 1 --optimized_spatial
+datasets/gsm8k/train.jsonl
+datasets/gsm8k/val.jsonl
+datasets/MultiArith/MultiArith.json
+datasets/SVAMP/SVAMP.json
+datasets/humaneval/humaneval-py.jsonl
 ```
+
+### Run Experiment Scripts
+
+The shell scripts run the configured GDesigner command first and then the dataset's baseline commands. They assume you are already in the `gdesigner` conda environment and running from the repository root.
+
+```bash
+bash experiments/run_mmlu_experiments.sh
+bash experiments/run_aqua_experiments.sh
+bash experiments/run_gsm8k_experiments.sh
+bash experiments/run_multiarith_experiments.sh
+bash experiments/run_svamp_experiments.sh
+bash experiments/run_humaneval_experiments.sh
+```
+
+### Run GDesigner Directly
+
+The current GDesigner commands use a single communication round (`--num_rounds 1`), optimize spatial topology only, sample 40 optimization examples, use 10 topology samples per query, and evaluate with a deterministic edge threshold of `0.5`.
+
+```bash
+python experiments/run_mmlu.py --mode Chain --agent_nums 5 --batch_size 4 --num_iterations 10 --num_rounds 1 --llm_name gpt-4o --optimized_spatial --train_limit 40 --sample_times 10 --limit_questions 153 --tau 1e-2 --zeta 1e-1 --eval_edge_threshold 0.5 --temperature 1.0 --quiet
+python experiments/run_aqua.py --mode Chain --agent_nums 5 --batch_size 4 --num_iterations 10 --num_rounds 1 --llm_name gpt-4o --optimized_spatial --train_limit 40 --sample_times 10 --limit_questions 254 --tau 1e-2 --zeta 1e-1 --eval_edge_threshold 0.5 --temperature 1.0 --quiet
+python experiments/run_gsm8k.py --mode Chain --agent_nums 5 --batch_size 4 --num_iterations 10 --num_rounds 1 --llm_name gpt-4o --optimized_spatial --train_limit 40 --sample_times 10 --limit_questions 1279 --tau 1e-2 --zeta 1e-1 --eval_edge_threshold 0.5 --temperature 1.0 --quiet
+python experiments/run_multiarith.py --mode Chain --agent_nums 5 --batch_size 4 --num_iterations 10 --num_rounds 1 --llm_name gpt-4o --optimized_spatial --train_limit 40 --sample_times 10 --limit_questions 560 --tau 1e-2 --zeta 1e-1 --eval_edge_threshold 0.5 --temperature 1.0 --quiet
+python experiments/run_svamp.py --mode Chain --agent_nums 5 --batch_size 4 --num_iterations 10 --num_rounds 1 --llm_name gpt-4o --optimized_spatial --train_limit 40 --sample_times 10 --limit_questions 960 --tau 1e-2 --zeta 1e-1 --eval_edge_threshold 0.5 --temperature 1.0 --quiet
+python experiments/run_humaneval.py --mode Chain --agent_nums 5 --batch_size 4 --num_iterations 10 --num_rounds 1 --llm_name gpt-4o --optimized_spatial --train_limit 40 --sample_times 10 --tau 1e-2 --zeta 1e-1 --eval_edge_threshold 0.5 --temperature 1.0 --quiet
+```
+
+### Run Baselines
+
+Each dataset has a separate baseline runner named `experiments/run_<dataset>_baseline.py`. Use `--mode` to select a baseline, for example:
+
+```bash
+python experiments/run_mmlu_baseline.py --mode Vanilla --batch_size 4 --num_rounds 1 --llm_name gpt-4o --limit_questions 153 --temperature 0.0 --quiet
+python experiments/run_gsm8k_baseline.py --mode CoT --batch_size 4 --num_rounds 1 --llm_name gpt-4o --limit_questions 1279 --temperature 0.0 --quiet
+```
+
+Results and usage metrics are written under `result/<dataset>/`.
 
 ## Acknowledgement
 
