@@ -2,7 +2,7 @@
 
 ## Overview
 
-GDesigner provides topology optimization for multi-agent LLM collaboration. Core implementation code is in `GDesigner`, dataset adapters are in `datasets`, and experiment entry points are in `experiments`.
+GDesigner provides topology optimization for multi-agent LLM collaboration. Core implementation code is in `GDesigner`, dataset adapters are in `datasets`, experiment entry points are in `experiments`, and dataset-specific train/evaluate helpers are in `experiments/<dataset>/`.
 
 ## Quick Start
 

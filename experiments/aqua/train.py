@@ -8,7 +8,7 @@ import torch
 
 from GDesigner.graph.graph import Graph
 from GDesigner.utils.globals import CompletionTokens, Cost, PromptTokens
-from experiments.accuracy import Accuracy
+from experiments.common.accuracy import Accuracy
 
 
 async def train(

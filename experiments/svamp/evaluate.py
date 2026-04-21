@@ -11,7 +11,7 @@ from tqdm import tqdm
 from GDesigner.graph.graph import Graph
 from GDesigner.utils.globals import CompletionTokens, Cost, PromptTokens
 from datasets.svamp_dataset import svamp_answer_equal
-from experiments.accuracy import Accuracy
+from experiments.common.accuracy import Accuracy
 
 
 def load_result(result_file: Path) -> List[Dict[str, Any]]:

@@ -8,7 +8,7 @@ from typing import List
 import copy
 
 from GDesigner.graph.graph import Graph
-from experiments.accuracy import Accuracy
+from experiments.common.accuracy import Accuracy
 from GDesigner.utils.globals import Cost, PromptTokens, CompletionTokens
 
 async def train(graph:Graph,

@@ -12,9 +12,9 @@ from typing import Union, Literal, List
 from GDesigner.graph.graph import Graph
 from datasets.mmlu_dataset import MMLUDataset
 from datasets.MMLU.download import download
-from experiments.train_mmlu import train
-from experiments.evaluate_mmlu import evaluate
-from experiments.usage_metrics import (
+from experiments.mmlu.train import train
+from experiments.mmlu.evaluate import evaluate
+from experiments.common.usage_metrics import (
     reset_usage_metrics,
     usage_delta,
     usage_snapshot,

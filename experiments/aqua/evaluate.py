@@ -10,8 +10,7 @@ from tqdm import tqdm
 
 from GDesigner.graph.graph import Graph
 from GDesigner.utils.globals import CompletionTokens, Cost, PromptTokens
-from datasets.multiarith_dataset import multiarith_answer_equal
-from experiments.accuracy import Accuracy
+from experiments.common.accuracy import Accuracy
 
 
 def load_result(result_file: Path) -> List[Dict[str, Any]]:
@@ -26,15 +25,14 @@ def load_result(result_file: Path) -> List[Dict[str, Any]]:
 async def evaluate(
     graph: Graph,
     dataset,
-    num_rounds: int = 3,
+    num_rounds: int = 1,
     limit_questions: Optional[int] = None,
     eval_batch_size: int = 4,
     result_file: Optional[Union[str, Path]] = None,
     method_name: Optional[str] = None,
     method_config: Optional[Dict[str, Any]] = None,
 ) -> float:
-    method_label = method_name or "gdesigner"
-    print(f"Evaluating {method_label} on {dataset.__class__.__name__} split {dataset.split}")
+    print(f"Evaluating gdesigner on {dataset.__class__.__name__} split {dataset.split}")
 
     graph.set_topology_train(False)
     graph.set_edge_sampling(True)
@@ -80,25 +78,30 @@ async def evaluate(
 
         for raw_answer, record, execution_trace in zip(raw_answers, record_batch, execution_traces):
             print("Raw answer:", raw_answer)
-            answer = dataset.postprocess_answer(raw_answer)
+            answer = dataset.postprocess_answer(raw_answer, options=record["options"])
             print("Postprocessed answer:", answer)
             correct_answer = dataset.record_to_target_answer(record)
             print("Correct answer:", correct_answer)
-            is_correct = multiarith_answer_equal(answer, correct_answer)
+            is_correct = answer == correct_answer
             total_correct += int(is_correct)
             total_executed += 1
-            accuracy.update("1" if is_correct else "0", "1")
+            accuracy.update(answer, correct_answer)
             accuracy.print()
             if result_data is not None:
                 result_data.append({
                     **({"Method": method_name} if method_name is not None else {}),
                     **({"Method_Config": method_config} if method_config is not None else {}),
-                    "Question": record["task"],
-                    "Index": record.get("index", ""),
-                    "Equation": record.get("equation", ""),
+                    "Question": record["question"],
+                    "Options": record["options"],
+                    "Option_A": record["A"],
+                    "Option_B": record["B"],
+                    "Option_C": record["C"],
+                    "Option_D": record["D"],
+                    "Option_E": record["E"],
                     "GT_Answer": correct_answer,
                     "Pred_Answer": answer,
                     "Raw_Answer": raw_answer,
+                    "Rationale": record.get("rationale", ""),
                     "Solved": bool(is_correct),
                     "Total_Solved": total_correct,
                     "Total_Executed": total_executed,

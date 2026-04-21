@@ -10,8 +10,8 @@ from tqdm import tqdm
 
 from GDesigner.graph.graph import Graph
 from GDesigner.utils.globals import CompletionTokens, Cost, PromptTokens
-from datasets.gsm8k_dataset import gsm8k_answer_equal
-from experiments.accuracy import Accuracy
+from datasets.multiarith_dataset import multiarith_answer_equal
+from experiments.common.accuracy import Accuracy
 
 
 def load_result(result_file: Path) -> List[Dict[str, Any]]:
@@ -84,7 +84,7 @@ async def evaluate(
             print("Postprocessed answer:", answer)
             correct_answer = dataset.record_to_target_answer(record)
             print("Correct answer:", correct_answer)
-            is_correct = gsm8k_answer_equal(answer, correct_answer)
+            is_correct = multiarith_answer_equal(answer, correct_answer)
             total_correct += int(is_correct)
             total_executed += 1
             accuracy.update("1" if is_correct else "0", "1")
@@ -93,8 +93,9 @@ async def evaluate(
                 result_data.append({
                     **({"Method": method_name} if method_name is not None else {}),
                     **({"Method_Config": method_config} if method_config is not None else {}),
-                    "Question": record["question"],
-                    "Step": record.get("step", ""),
+                    "Question": record["task"],
+                    "Index": record.get("index", ""),
+                    "Equation": record.get("equation", ""),
                     "GT_Answer": correct_answer,
                     "Pred_Answer": answer,
                     "Raw_Answer": raw_answer,

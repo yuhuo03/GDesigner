@@ -16,9 +16,9 @@ from GDesigner.graph.graph import Graph
 from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.utils.globals import Time
 from datasets.humaneval_dataset import HUMANEVAL_DEFAULT_PATH, HumanEvalDataset
-from experiments.evaluate_humaneval import evaluate
-from experiments.train_humaneval import train
-from experiments.usage_metrics import (
+from experiments.humaneval.evaluate import evaluate
+from experiments.humaneval.train import train
+from experiments.common.usage_metrics import (
     reset_usage_metrics,
     usage_delta,
     usage_snapshot,

@@ -18,8 +18,8 @@ from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.utils.globals import Time
 from datasets.AQuA.download import download
 from datasets.aqua_dataset import AQuADataset, AQUA_CHOICES
-from experiments.evaluate_aqua import evaluate
-from experiments.usage_metrics import (
+from experiments.aqua.evaluate import evaluate
+from experiments.common.usage_metrics import (
     reset_usage_metrics,
     usage_delta,
     usage_snapshot,

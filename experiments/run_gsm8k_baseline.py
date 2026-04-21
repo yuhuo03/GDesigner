@@ -17,8 +17,8 @@ from GDesigner.graph.graph import Graph
 from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.utils.globals import Time
 from datasets.gsm8k_dataset import GSM8KDataset
-from experiments.evaluate_gsm8k import evaluate
-from experiments.usage_metrics import (
+from experiments.gsm8k.evaluate import evaluate
+from experiments.common.usage_metrics import (
     reset_usage_metrics,
     usage_delta,
     usage_snapshot,
