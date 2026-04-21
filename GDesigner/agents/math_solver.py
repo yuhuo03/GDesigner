@@ -5,7 +5,6 @@ from GDesigner.agents.agent_registry import AgentRegistry
 from GDesigner.llm.llm_registry import LLMRegistry
 from GDesigner.prompt.prompt_set_registry import PromptSetRegistry
 from GDesigner.tools.coding.python_executor import execute_code_get_return
-from datasets.gsm8k_dataset import gsm_get_predict
 
 @AgentRegistry.register('MathSolver')
 class MathSolver(Node):
@@ -26,9 +25,9 @@ class MathSolver(Node):
         if self.role == "Math Solver":
             user_prompt += "(Hint: The answer is near to"
             for id, info in spatial_info.items():
-                user_prompt += " "+gsm_get_predict(info["output"])
+                user_prompt += " " + self.prompt_set.postprocess_answer(info["output"])
             for id, info in temporal_info.items():
-                user_prompt += " "+gsm_get_predict(info["output"])
+                user_prompt += " " + self.prompt_set.postprocess_answer(info["output"])
             user_prompt += ")."
         else:
             for id, info in spatial_info.items():
