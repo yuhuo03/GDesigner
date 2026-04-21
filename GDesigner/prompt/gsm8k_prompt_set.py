@@ -1,8 +1,9 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Union
 import itertools
 from GDesigner.prompt.prompt_set import PromptSet
 from GDesigner.prompt.prompt_set_registry import PromptSetRegistry
 from GDesigner.prompt.common import get_combine_materials
+from datasets.gsm8k_dataset import gsm8k_postprocess_answer
 
 roles = itertools.cycle(['Math Solver',
                          'Mathematical Analyst',
@@ -201,11 +202,11 @@ class GSM8KPromptSet(PromptSet):
 
     @staticmethod
     def get_constraint(role):
-        return ROLE_DESCRIPTION[role]
+        return ROLE_DESCRIPTION.get(role, ROLE_DESCRIPTION["Math Solver"])
 
     @staticmethod
     def get_description(role):
-        return ROLE_DESCRIPTION[role]
+        return ROLE_DESCRIPTION.get(role, role or "")
 
     @staticmethod
     def get_role_connection():
@@ -217,7 +218,44 @@ class GSM8KPromptSet(PromptSet):
 
     @staticmethod
     def get_answer_prompt(question, role="Mathematical Analyst"):
-        return FEW_SHOT_DATA[role] + "\n\n---END OF EXAMPLES---\n\nQ:" + question
+        shots = FEW_SHOT_DATA.get(role, FEW_SHOT_DATA["Mathematical Analyst"])
+        return shots + "\n\n---END OF EXAMPLES---\n\nQ:" + question
+
+    @staticmethod
+    def get_baseline_constraint(prompt_style: str, role: str | None = None) -> str:
+        prompt_style = prompt_style.lower()
+        base = """
+I will ask you a grade-school math word problem.
+Solve the problem and provide the numeric answer without units.
+Always put your final answer on the last line exactly in this format:
+The answer is X
+where X is the numeric answer.
+"""
+        if prompt_style == "vanilla":
+            return base + """
+Reply with only the final answer line.
+Do not include analysis.
+"""
+        if prompt_style == "cot":
+            return base + """
+Reason step by step before giving the final answer.
+Keep the reasoning concise.
+"""
+        if prompt_style == "complex_cot":
+            return base + """
+Reason carefully through the quantities, operations, and edge cases before giving the final answer.
+Keep the reasoning concise and avoid unnecessary alternatives.
+"""
+        if prompt_style == "php":
+            return base + """
+Provide concise progressive hints before giving the final answer.
+Start from the key quantity, then derive the needed intermediate values, then finish with the final answer line.
+"""
+        raise ValueError(f"Unsupported GSM8K baseline prompt style: {prompt_style}")
+
+    @staticmethod
+    def get_baseline_answer_prompt(question, prompt_style: str):
+        return f"The task is:\n\n{question}"
 
     @staticmethod
     def get_decision_constraint():
@@ -379,3 +417,7 @@ The answer is 70000
     @staticmethod
     def get_combine_materials(materials: Dict[str, Any]) -> str:
         return get_combine_materials(materials)
+
+    @staticmethod
+    def postprocess_answer(answer: Union[str, List[str]]) -> str:
+        return gsm8k_postprocess_answer(answer)

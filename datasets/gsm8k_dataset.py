@@ -1,30 +1,32 @@
-import re
-from typing import Union, Literal, Any, Dict, List
 import json
-import numpy as np
+import re
+from decimal import Decimal, InvalidOperation
+from fractions import Fraction
 from pathlib import Path
+from typing import Any, Dict, List, Literal, Union
+
+import numpy as np
+
+
+GSM8K_DEFAULT_DATA_DIR = "datasets/gsm8k"
+_NUMBER_PATTERN = r"-?(?:\d+\.\d+|\d+|\.\d+)(?:/\d+)?"
 
 
 class GSM8KDataset:
-    def __init__(self,
-                 split: Union[Literal['train'], Literal['val']],
-                 ) -> None:
-        self._split = split
-        data_path = Path(f"datasets/gsm8k/{split}.jsonl")
-        self._data: List[Dict[str, Any]] = self._load_data(data_path)
+    def __init__(
+        self,
+        split: Union[Literal["train"], Literal["val"], Literal["test"], Literal["full"]],
+        data_dir: Union[str, Path] = GSM8K_DEFAULT_DATA_DIR,
+        seed: int = 42,
+    ) -> None:
+        self._split = "val" if split == "test" else split
+        self.data_dir = Path(data_dir)
+        self.seed = seed
+        self._data: List[Dict[str, Any]] = self._load_data(self._resolve_data_file())
 
     @staticmethod
     def get_domain() -> str:
-        return 'gsm8k'
-
-    def _load_data(self, data_path: Path) -> List[Dict[str, Any]]:
-        rng = np.random.default_rng(42)
-        with open(data_path, "r", encoding="utf-8") as f:
-            data = [json.loads(line) for line in f]
-        data = list(data)
-        data = data  # keep original order for reproducibility
-        print(f"[GSM8KDataset] Loaded {len(data)} samples from {data_path}")
-        return data
+        return "gsm8k"
 
     @property
     def split(self) -> str:
@@ -34,11 +36,34 @@ class GSM8KDataset:
         return len(self._data)
 
     def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
+        for index in range(len(self)):
+            yield self[index]
 
     def __getitem__(self, index):
-        return self._data[index]
+        if isinstance(index, (int, np.integer)):
+            return self._data[int(index)]
+        if isinstance(index, slice):
+            return self._data[index]
+        raise TypeError(f"indices must be int or slice, not {type(index)}")
+
+    def _resolve_data_file(self) -> Path:
+        split_files = {
+            "train": "train.jsonl",
+            "val": "val.jsonl",
+            "full": "gsm8k.jsonl",
+        }
+        if self._split not in split_files:
+            raise ValueError(f"Unsupported GSM8K split: {self._split}")
+        data_file = self.data_dir / split_files[self._split]
+        if not data_file.exists():
+            raise FileNotFoundError(f"Missing GSM8K {self._split} split at {data_file}.")
+        return data_file
+
+    def _load_data(self, data_path: Path) -> List[Dict[str, Any]]:
+        with open(data_path, "r", encoding="utf-8") as file:
+            data = [json.loads(line) for line in file if line.strip()]
+        print(f"[GSM8KDataset] Loaded {len(data)} samples from {data_path}")
+        return data
 
     @staticmethod
     def record_to_input(record: Dict[str, Any]) -> Dict[str, Any]:
@@ -46,118 +71,141 @@ class GSM8KDataset:
 
     @staticmethod
     def postprocess_answer(answer: Union[str, List[str]]) -> str:
-        if isinstance(answer, list):
-            if len(answer) > 0:
-                answer = answer[0]
-            else:
-                answer = ""
-        if not isinstance(answer, str):
-            raise Exception("Expected string")
-        pred_str = answer
-        if 'The answer is ' in pred_str:
-            pred = pred_str.split('The answer is ')[-1].strip()
-        elif 'the answer is ' in pred_str:
-            pred = pred_str.split('the answer is ')[-1].strip()
-        elif 'boxed' in pred_str:
-            ans = pred_str.split('boxed')[-1]
-            if ans and ans[0] == '{':
-                stack = 1
-                a = ''
-                for c in ans[1:]:
-                    if c == '{':
-                        stack += 1
-                        a += c
-                    elif c == '}':
-                        stack -= 1
-                        if stack == 0:
-                            break
-                        a += c
-                    else:
-                        a += c
-                pred = GSM8KDataset._strip_string(a)
-            else:
-                a = ans.split('$')[0].strip()
-                pred = GSM8KDataset._strip_string(a)
-        else:
-            pattern = '-?\d*\.?\d+'
-            pred = re.findall(pattern, pred_str)
-            if len(pred) >= 1:
-                pred = pred[-1]
-            else:
-                pred = ''
-
-        if pred != "":
-            if pred[-1] == ".":
-                pred = pred[:-1]
-            if pred[-1] == "/":
-                pred = pred[:-1]
-
-        pred = GSM8KDataset._strip_string(pred)
-
-        if 'boxed' in pred:
-            ans = pred.split('boxed')[-1]
-            if ans and ans[0] == '{':
-                stack = 1
-                a = ''
-                for c in ans[1:]:
-                    if c == '{':
-                        stack += 1
-                        a += c
-                    elif c == '}':
-                        stack -= 1
-                        if stack == 0:
-                            break
-                        a += c
-                    else:
-                        a += c
-                pred = GSM8KDataset._strip_string(a)
-            else:
-                a = ans.split('$')[0].strip()
-                pred = GSM8KDataset._strip_string(a)
-
-        if pred.isdigit():
-            return pred
-        else:
-            matches = re.findall(r'\d+', pred)
-            return matches[-1] if matches else '0'
+        return gsm8k_postprocess_answer(answer)
 
     @staticmethod
     def record_to_target_answer(record: Dict[str, Any]) -> str:
         raw_answer = record["answer"]
-        raw_answer_list = raw_answer.split("\n####")
-        return raw_answer_list[-1].replace(",", "").strip()
-
-    @staticmethod
-    def _strip_string(string: str) -> str:
-        string = string.replace("\n", "")
-        string = string.replace("\\!", "")
-        string = string.replace("\\\\", "\\")
-        string = string.replace("tfrac", "frac")
-        string = string.replace("dfrac", "frac")
-        string = string.replace("\\left", "")
-        string = string.replace("\\right", "")
-        string = string.replace("^{\\circ}", "")
-        string = string.replace("^\\circ", "")
-        string = string.replace("\\$", "")
-        if "\\text{ " in string:
-            splits = string.split("\\text{ ")
-            if len(splits) == 2:
-                string = splits[0]
-        string = string.replace("\\%", "")
-        string = string.replace("\%", "")
-        if len(string.split("=")) == 2:
-            parts = string.split("=")
-            if len(parts[0]) <= 2:
-                string = parts[1]
-        if string.startswith("."):
-            string = "0" + string
-        if string == "0.5":
-            string = "\\frac{1}{2}"
-        string = string.replace(" ", "")
-        return string
+        parsed_answer = gsm8k_postprocess_answer(raw_answer)
+        if parsed_answer:
+            return parsed_answer
+        raw_answer_list = raw_answer.split("####")
+        return normalize_numeric_answer(raw_answer_list[-1])
 
 
-# Backwards-compatible re-export (used by MathSolver agent)
+def gsm8k_postprocess_answer(answer: Union[str, List[str]]) -> str:
+    if isinstance(answer, list):
+        for item in answer:
+            parsed = gsm8k_postprocess_answer(item)
+            if parsed:
+                return parsed
+        return ""
+
+    if not isinstance(answer, str):
+        return ""
+
+    pred_str = answer.strip()
+    if not pred_str:
+        return ""
+
+    candidates = []
+    answer_patterns = [
+        r"(?:final answer|the answer is|answer is|answer)\s*[:：]?\s*([^\n\r]+)",
+        r"####\s*([^\n\r]+)",
+    ]
+    for pattern in answer_patterns:
+        matches = re.findall(pattern, pred_str, flags=re.IGNORECASE)
+        candidates.extend(matches)
+
+    boxed_value = _extract_boxed_value(pred_str)
+    if boxed_value:
+        candidates.append(boxed_value)
+
+    for candidate in reversed(candidates):
+        numeric = _extract_answer_candidate_number(candidate)
+        if numeric:
+            return normalize_numeric_answer(numeric)
+    return normalize_numeric_answer(_extract_last_number(pred_str))
+
+
+def normalize_numeric_answer(answer: Any) -> str:
+    text = str(answer).strip()
+    if not text:
+        return ""
+    text = text.replace(",", "").replace("$", "").replace("%", "")
+    text = text.replace("\\", "").replace("{", "").replace("}", "")
+    text = re.sub(r"\s+", "", text)
+    text = text.strip(".,;:()[]")
+    if text.startswith("+"):
+        text = text[1:]
+    return text
+
+
+def gsm8k_answer_equal(predicted: Union[str, List[str]], target: Union[str, List[str]]) -> bool:
+    pred = normalize_numeric_answer(_parsed_or_first_raw(predicted))
+    gold = normalize_numeric_answer(_parsed_or_first_raw(target))
+    if not pred or not gold:
+        return pred == gold
+
+    pred_number = _to_number(pred)
+    gold_number = _to_number(gold)
+    if pred_number is not None and gold_number is not None:
+        return pred_number == gold_number
+    return pred == gold
+
+
 def gsm_get_predict(pred_str):
-    """Alias for GSM8KDataset.postprocess_answer for backwards compatibility."""
-    return GSM8KDataset.postprocess_answer(pred_str)
+    return gsm8k_postprocess_answer(pred_str)
+
+
+def _parsed_or_first_raw(answer: Union[str, List[str]]) -> str:
+    parsed = gsm8k_postprocess_answer(answer)
+    if parsed:
+        return parsed
+    if isinstance(answer, list):
+        return answer[0] if answer else ""
+    return answer
+
+
+def _extract_last_number(text: str) -> str:
+    normalized = text.replace(",", "")
+    matches = re.findall(_NUMBER_PATTERN, normalized)
+    return matches[-1] if matches else ""
+
+
+def _extract_answer_candidate_number(text: str) -> str:
+    normalized = text.replace(",", "").strip()
+    direct_number = re.match(rf"^({_NUMBER_PATTERN})(?:\s*(?:[.!。]|$))", normalized)
+    if direct_number:
+        return direct_number.group(1)
+    return _extract_last_number(normalized)
+
+
+def _extract_boxed_value(text: str) -> str:
+    marker = "boxed"
+    lower = text.lower()
+    if marker not in lower:
+        return ""
+    start = lower.rfind(marker) + len(marker)
+    rest = text[start:].lstrip()
+    if not rest:
+        return ""
+    if rest[0] != "{":
+        return rest.split("$")[0].strip()
+
+    depth = 1
+    value = []
+    for char in rest[1:]:
+        if char == "{":
+            depth += 1
+            value.append(char)
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                break
+            value.append(char)
+        else:
+            value.append(char)
+    return "".join(value).strip()
+
+
+def _to_number(text: str):
+    text = normalize_numeric_answer(text)
+    if not text:
+        return None
+    try:
+        if "/" in text and text.count("/") == 1:
+            return Fraction(text)
+        return Decimal(text)
+    except (InvalidOperation, ValueError, ZeroDivisionError):
+        return None
