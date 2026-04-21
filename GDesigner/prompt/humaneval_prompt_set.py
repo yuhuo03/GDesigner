@@ -1,8 +1,9 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Union
 import itertools
 from GDesigner.prompt.prompt_set import PromptSet
 from GDesigner.prompt.prompt_set_registry import PromptSetRegistry
 from GDesigner.prompt.common import get_combine_materials
+from datasets.humaneval_dataset import humaneval_postprocess_answer
 
 roles = itertools.cycle(['Project Manager',
                          'Algorithm Designer',
@@ -84,11 +85,11 @@ class HumanEvalPromptSet(PromptSet):
 
     @staticmethod
     def get_constraint(role):
-        return ROLE_DESCRIPTION[role]
+        return ROLE_DESCRIPTION.get(role, ROLE_DESCRIPTION["Programming Expert"])
 
     @staticmethod
     def get_description(role):
-        return ROLE_DESCRIPTION[role]
+        return ROLE_DESCRIPTION.get(role, role or "")
     
     @staticmethod
     def get_role_connection():
@@ -102,6 +103,47 @@ class HumanEvalPromptSet(PromptSet):
     def get_answer_prompt(question):
         # Format the question for the AI assistant to answer
         return f"{question}"
+
+    @staticmethod
+    def get_baseline_constraint(prompt_style: str, role: str | None = None) -> str:
+        prompt_style = prompt_style.lower()
+        base = """
+You will be given a Python function signature and docstring.
+Write a correct, concise Python implementation.
+Do not change the function name, arguments, or expected return type.
+The final answer must include a complete Python code block with the full function definition.
+"""
+        if prompt_style == "vanilla":
+            return base + """
+Reply with only one Python code block.
+Do not include analysis outside the code block.
+"""
+        if prompt_style == "cot":
+            return base + """
+Reason briefly before writing the implementation.
+Keep the reasoning concise.
+Put the final implementation in the last Python code block.
+Do not write anything after the final code block.
+"""
+        if prompt_style == "complex_cot":
+            return base + """
+Reason carefully about edge cases, input constraints, and the simplest correct algorithm.
+Keep the reasoning concise.
+Put the final implementation in the last Python code block.
+Do not write anything after the final code block.
+"""
+        if prompt_style == "php":
+            return base + """
+Provide concise progressive hints before writing the implementation.
+Start from the key idea, then note important edge cases, then write the final code.
+Put the final implementation in the last Python code block.
+Do not write anything after the final code block.
+"""
+        raise ValueError(f"Unsupported HumanEval baseline prompt style: {prompt_style}")
+
+    @staticmethod
+    def get_baseline_answer_prompt(question, prompt_style: str):
+        return f"The task is:\n\n{question}"
 
     @staticmethod
     def get_react_prompt(question, solution, feedback):
@@ -253,3 +295,7 @@ f"6. Adhere to the constraints: {constraint}.\n"
     @staticmethod
     def get_decision_few_shot():
         return ""
+
+    @staticmethod
+    def postprocess_answer(answer: Union[str, List[str]]) -> str:
+        return humaneval_postprocess_answer(answer)

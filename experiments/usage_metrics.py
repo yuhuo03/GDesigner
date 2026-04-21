@@ -72,6 +72,7 @@ def usage_with_time(
 def result_stats(
     result_file: Union[str, Path],
     valid_predictions: Optional[Iterable[str]] = None,
+    track_invalid_predictions: bool = True,
 ) -> Dict[str, Union[float, int]]:
     valid_prediction_set = set(valid_predictions or {"A", "B", "C", "D"})
     result_path = Path(result_file)
@@ -96,11 +97,13 @@ def result_stats(
 
     total_executed = len(records)
     total_solved = sum(1 for record in records if record.get("Solved"))
-    invalid_predictions = sum(
-        1
-        for record in records
-        if record.get("Pred_Answer") not in valid_prediction_set
-    )
+    invalid_predictions = 0
+    if track_invalid_predictions:
+        invalid_predictions = sum(
+            1
+            for record in records
+            if record.get("Pred_Answer") not in valid_prediction_set
+        )
     accuracy = total_solved / total_executed if total_executed else 0.0
     return {
         "Total_Solved": total_solved,
@@ -125,10 +128,15 @@ def write_run_metrics(
     inference_seconds: float = 0.0,
     csv_file: Optional[Union[str, Path]] = None,
     valid_predictions: Optional[Iterable[str]] = None,
+    track_invalid_predictions: bool = True,
 ) -> Path:
     result_path = Path(result_file)
     metrics_path = result_path.with_name(f"{result_path.stem}_metrics.json")
-    stats = result_stats(result_path, valid_predictions=valid_predictions)
+    stats = result_stats(
+        result_path,
+        valid_predictions=valid_predictions,
+        track_invalid_predictions=track_invalid_predictions,
+    )
 
     training = usage_with_time(training_usage or zero_usage(), training_seconds)
     inference = usage_with_time(inference_usage or zero_usage(), inference_seconds)

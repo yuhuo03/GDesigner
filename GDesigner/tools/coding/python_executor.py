@@ -73,15 +73,22 @@ class PyExecutor(Executor):
         probably should be written in a dataset-agnostic way but not now
         """
         
-        code = f"""{func}
+        code = f"""from typing import *
+import math
+import collections
+import itertools
+import functools
+import heapq
+import bisect
+
+{func}
 
 {test}
 
 check({name})
     """
         try:
-            function_with_timeout(exec, (code, globals()), timeout)
+            function_with_timeout(exec, (code, {}), timeout)
             return True
         except Exception:
             return False
-        

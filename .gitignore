@@ -6,6 +6,8 @@
 *.log
 *.ipynb
 *.sh
+!experiments/run_aqua_experiments.sh
+!experiments/run_humaneval_experiments.sh
 *.ps1
 .pyc
 

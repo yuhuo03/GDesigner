@@ -78,7 +78,7 @@ class CodeWriting(Node):
         if system_prompt == "is_solved":
             return user_prompt
         message = [{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}]
-        response = await self.llm.agen(message)
+        response = await self.llm.agen(message, temperature=getattr(self, "llm_temperature", None))
         self.record_execution(system_prompt, user_prompt, response, spatial_info, temporal_info)
         self.print_agent_io(system_prompt, user_prompt, response)
         return response
