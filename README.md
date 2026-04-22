@@ -16,14 +16,14 @@ pip install -r requirements.txt
 
 ### Add API keys in `template.env` and change its name to `.env`
 
-```python
+```dotenv
 BASE_URL = "" # the BASE_URL of OpenAI LLM backend
 API_KEY = "" # for OpenAI LLM backend
 LLM_BACKEND = "openai" # openai or vllm
 VLLM_BASE_URL = "http://127.0.0.1:8000/v1"
 VLLM_API_KEY = "EMPTY"
-VLLM_MODEL = "Qwen3-8B"
-VLLM_EXTRA_BODY_JSON = ""
+VLLM_MODEL = "gpt-oss-120b"
+VLLM_EXTRA_BODY_JSON = '{"reasoning_effort":"low"}'
 ```
 
 ### Prepare Datasets
@@ -86,6 +86,18 @@ Results and usage metrics are written under `result/<dataset>/`.
 
 GDesigner can use a local vLLM server through its OpenAI-compatible chat completions API. Start vLLM outside this project, for example:
 
+For `gpt-oss-120b`:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve openai/gpt-oss-120b \
+  --served-model-name gpt-oss-120b \
+  --tensor-parallel-size 4 \
+  --host 0.0.0.0 \
+  --port 8000
+```
+
+For Qwen3:
+
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve Qwen/Qwen3-8B \
   --served-model-name Qwen3-8B \
@@ -97,18 +109,27 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve Qwen/Qwen3-8B \
 
 Then switch the backend with environment variables. Existing experiment commands do not need to change.
 
+For `gpt-oss-120b`, use a low reasoning effort to reduce latency and avoid spending too many completion tokens on hidden reasoning:
+
 ```bash
-LLM_BACKEND=vllm \
-VLLM_BASE_URL=http://127.0.0.1:8000/v1 \
-VLLM_API_KEY=EMPTY \
-VLLM_MODEL=Qwen3-8B \
+export LLM_BACKEND=vllm
+export VLLM_BASE_URL=http://127.0.0.1:8000/v1
+export VLLM_API_KEY=EMPTY
+export VLLM_MODEL=gpt-oss-120b
+export VLLM_EXTRA_BODY_JSON='{"reasoning_effort":"low"}'
+```
+
+Then run any existing experiment command, for example:
+
+```bash
 python experiments/run_mmlu_baseline.py --mode Vanilla --batch_size 1 --num_rounds 1 --limit_questions 1 --quiet
 ```
 
-For Qwen3 runs where you want to disable thinking through vLLM's chat template options, pass an extra request body:
+For Qwen3 runs where you want to disable thinking through vLLM's chat template options, use:
 
 ```bash
-VLLM_EXTRA_BODY_JSON='{"chat_template_kwargs":{"enable_thinking":false}}'
+export VLLM_MODEL=Qwen3-8B
+export VLLM_EXTRA_BODY_JSON='{"chat_template_kwargs":{"enable_thinking":false}}'
 ```
 
 Local vLLM runs record `Cost` as `0.0`. Token counts are read from the OpenAI-compatible `usage` field when the server returns it.
