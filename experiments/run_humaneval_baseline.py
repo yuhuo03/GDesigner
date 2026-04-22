@@ -14,6 +14,7 @@ import GDesigner.agents  # noqa: F401
 import GDesigner.llm  # noqa: F401
 import GDesigner.prompt  # noqa: F401
 from GDesigner.graph.graph import Graph
+from GDesigner.llm.config import resolve_runtime_model_name, sanitize_model_name
 from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.utils.globals import Time
 from datasets.humaneval_dataset import HUMANEVAL_DEFAULT_PATH, HumanEvalDataset
@@ -279,6 +280,8 @@ def build_graph(config: Dict[str, Any], args) -> Graph:
 
 async def main():
     args = parse_args()
+    args.llm_name = resolve_runtime_model_name(args.llm_name)
+    result_llm_name = sanitize_model_name(args.llm_name)
     random.seed(args.seed)
     config = resolve_method_config(args)
 
@@ -287,7 +290,7 @@ async def main():
     result_dir = Path(args.result_dir) if args.result_dir else Path(GDesigner_ROOT / "result" / "humaneval")
     result_dir.mkdir(parents=True, exist_ok=True)
     safe_mode = args.mode.replace("/", "_")
-    result_file = result_dir / f"{args.llm_name}_{current_time}_{safe_mode}.json"
+    result_file = result_dir / f"{result_llm_name}_{current_time}_{safe_mode}.json"
 
     if config["implementation_type"] == "skipped":
         with open(result_file, "w", encoding="utf-8") as file:

@@ -13,6 +13,7 @@ import GDesigner.agents  # noqa: F401
 import GDesigner.llm  # noqa: F401
 import GDesigner.prompt  # noqa: F401
 from GDesigner.graph.graph import Graph
+from GDesigner.llm.config import resolve_runtime_model_name, sanitize_model_name
 from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.utils.globals import Time
 from datasets.humaneval_dataset import HUMANEVAL_DEFAULT_PATH, HumanEvalDataset
@@ -91,6 +92,8 @@ def parse_args():
 
 async def main():
     args = parse_args()
+    args.llm_name = resolve_runtime_model_name(args.llm_name)
+    result_llm_name = sanitize_model_name(args.llm_name)
     if args.optimized_temporal and not args.optimized_spatial:
         print("HumanEval topology optimization learns spatial edges; enabling --optimized_spatial because --optimized_temporal was set.")
         args.optimized_spatial = True
@@ -121,7 +124,7 @@ async def main():
     Time.instance().value = current_time
     result_dir = Path(GDesigner_ROOT / "result" / "humaneval")
     result_dir.mkdir(parents=True, exist_ok=True)
-    result_file = result_dir / f"{args.llm_name}_{current_time}.json"
+    result_file = result_dir / f"{result_llm_name}_{current_time}.json"
 
     dataset_train = None
     if args.optimized_spatial or args.optimized_temporal:

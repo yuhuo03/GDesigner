@@ -465,7 +465,7 @@ class Graph(ABC):
 
 
     def run(self, inputs: Any, 
-                  num_rounds:int = 3, 
+                  num_rounds:int = 1,
                   max_tries: int = 3, 
                   max_time: int = 600,) -> List[Any]:
         # inputs:{'task':"xxx"}
@@ -508,7 +508,7 @@ class Graph(ABC):
         return final_answers, log_probs
 
     async def arun(self, input: Dict[str,str], 
-                  num_rounds:int = 3, 
+                  num_rounds:int = 1,
                   max_tries: int = 3, 
                   max_time: int = 600,) -> List[Any]:
         # inputs:{'task':"xxx"}

@@ -9,7 +9,11 @@ import time
 from pathlib import Path
 from typing import List, Literal, Union
 
+import GDesigner.agents  # noqa: F401
+import GDesigner.llm  # noqa: F401
+import GDesigner.prompt  # noqa: F401
 from GDesigner.graph.graph import Graph
+from GDesigner.llm.config import resolve_runtime_model_name, sanitize_model_name
 from GDesigner.utils.const import GDesigner_ROOT
 from GDesigner.utils.globals import Time
 from datasets.AQuA.download import download
@@ -84,6 +88,8 @@ def parse_args():
 
 async def main():
     args = parse_args()
+    args.llm_name = resolve_runtime_model_name(args.llm_name)
+    result_llm_name = sanitize_model_name(args.llm_name)
     if args.optimized_temporal and not args.optimized_spatial:
         print("AQuA topology optimization learns spatial edges; enabling --optimized_spatial because --optimized_temporal was set.")
         args.optimized_spatial = True
@@ -114,7 +120,7 @@ async def main():
     Time.instance().value = current_time
     result_dir = Path(GDesigner_ROOT / "result" / "aqua")
     result_dir.mkdir(parents=True, exist_ok=True)
-    result_file = result_dir / f"{args.llm_name}_{current_time}.json"
+    result_file = result_dir / f"{result_llm_name}_{current_time}.json"
 
     required_splits = ("train", "test") if (args.optimized_spatial or args.optimized_temporal) else ("test",)
     download(data_dir=args.data_dir, required_splits=required_splits)

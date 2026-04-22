@@ -25,7 +25,7 @@ def load_result(result_file: Path) -> List[Dict[str, Any]]:
 async def evaluate(
     graph: Graph,
     dataset,
-    num_rounds: int = 3,
+    num_rounds: int = 1,
     limit_questions: Optional[int] = None,
     eval_batch_size: int = 4,
     result_file: Optional[Union[str, Path]] = None,

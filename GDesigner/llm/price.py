@@ -4,24 +4,30 @@ import tiktoken
 # GPT3.5: https://platform.openai.com/docs/models/gpt-3-5
 # DALL-E: https://openai.com/pricing
 
-def cal_token(model:str, text:str):
-    encoder = tiktoken.encoding_for_model(model)
+def cal_token(model: str, text: str):
+    try:
+        encoder = tiktoken.encoding_for_model(model)
+    except KeyError:
+        encoder = tiktoken.get_encoding("cl100k_base")
     num_tokens = len(encoder.encode(text))
     return num_tokens
 
-def cost_count(prompt, response, model_name):
+def cost_count(prompt, response, model_name, prompt_tokens=None, completion_tokens=None, zero_cost: bool = False):
     branch: str
     prompt_len: int
     completion_len: int
     price: float
 
-    prompt_len = cal_token(model_name, prompt)
-    completion_len = cal_token(model_name, response)
-    if "gpt-4" in model_name:
+    prompt_len = int(prompt_tokens) if prompt_tokens is not None else cal_token(model_name, prompt)
+    completion_len = int(completion_tokens) if completion_tokens is not None else cal_token(model_name, response)
+    if zero_cost:
+        branch = "local"
+        price = 0.0
+    elif "gpt-4" in model_name and model_name in OPENAI_MODEL_INFO["gpt-4"]:
         branch = "gpt-4"
         price = prompt_len * OPENAI_MODEL_INFO[branch][model_name]["input"] /1000 + \
                 completion_len * OPENAI_MODEL_INFO[branch][model_name]["output"] /1000
-    elif "gpt-3.5" in model_name:
+    elif "gpt-3.5" in model_name and model_name in OPENAI_MODEL_INFO["gpt-3.5"]:
         branch = "gpt-3.5"
         price = prompt_len * OPENAI_MODEL_INFO[branch][model_name]["input"] /1000 + \
             completion_len * OPENAI_MODEL_INFO[branch][model_name]["output"] /1000
@@ -33,8 +39,6 @@ def cost_count(prompt, response, model_name):
     else:
         branch = "other"
         price = 0.0
-        prompt_len = 0
-        completion_len = 0
 
     Cost.instance().value += price
     PromptTokens.instance().value += prompt_len
@@ -169,6 +173,4 @@ OPENAI_MODEL_INFO ={
         }
     }
 }
-
-
 

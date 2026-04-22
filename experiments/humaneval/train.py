@@ -15,7 +15,7 @@ async def train(
     graph: Graph,
     dataset,
     num_iters: int = 10,
-    num_rounds: int = 3,
+    num_rounds: int = 1,
     lr: float = 0.1,
     batch_size: int = 4,
     train_limit: int = 40,
