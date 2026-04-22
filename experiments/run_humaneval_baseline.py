@@ -54,7 +54,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run one HumanEval baseline method.")
     parser.add_argument("--mode", type=str, required=True, choices=BASELINE_MODES)
     parser.add_argument("--data_path", "--dataset_json", dest="data_path", type=str, default=HUMANEVAL_DEFAULT_PATH)
-    parser.add_argument("--llm_name", type=str, default="gpt-4-1106-preview")
+    parser.add_argument("--llm_name", type=str, default="gpt-4o")
     parser.add_argument("--domain", type=str, default="humaneval")
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--agent_nums", type=int, default=None)

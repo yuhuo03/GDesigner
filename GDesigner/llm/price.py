@@ -49,7 +49,7 @@ def cost_count(prompt, response, model_name, prompt_tokens=None, completion_toke
 
 OPENAI_MODEL_INFO ={
     "gpt-4": {
-        "current_recommended": "gpt-4-1106-preview",
+        "current_recommended": "gpt-4o",
         "gpt-4-0125-preview": {
             "context window": 128000, 
             "training": "Jan 2024", 
@@ -173,4 +173,3 @@ OPENAI_MODEL_INFO ={
         }
     }
 }
-
