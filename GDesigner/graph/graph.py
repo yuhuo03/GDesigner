@@ -335,7 +335,7 @@ class Graph(ABC):
             if not self.check_cycle(in_node, {out_node}):
                 edge_prob = torch.sigmoid(edge_logit / temperature).clamp(1e-6, 1 - 1e-6)
                 if threshold is not None:
-                    keep_edge = bool(edge_prob >= threshold)
+                    keep_edge = bool(edge_logit.detach() != 0)
                 else:
                     keep_edge = bool(torch.rand(1, device=edge_prob.device) < edge_prob)
                 if keep_edge:
