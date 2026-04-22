@@ -61,6 +61,9 @@ class Node(ABC):
         self.outputs: List[Any] = []
         self.raw_inputs: List[Any] = []
         self.role = ""
+        self.base_profile: str = ""
+        self.profile_state: str = "No accumulated interaction history before execution."
+        self.plugins: List[str] = []
         self.last_memory: Dict[str,List[Any]] = {'inputs':[],'outputs':[],'raw_inputs':[]}        
         self.execution_trace: List[Dict[str, Any]] = []
         self.verbose: bool = True
@@ -162,7 +165,10 @@ class Node(ABC):
         self.execution_trace.append({
             "node_id": self.id,
             "node_type": self.node_name,
+            "base_profile": self.base_profile or self.llm_name,
             "role": self.role,
+            "profile_state": self.profile_state,
+            "plugins": list(self.plugins),
             "domain": self.domain,
             "system_prompt": system_prompt,
             "user_prompt": user_prompt,

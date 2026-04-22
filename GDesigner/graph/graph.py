@@ -82,6 +82,7 @@ class Graph(ABC):
         self.llm_temperature = llm_temperature
         self.verbose = verbose
         self.decision_node:Node = AgentRegistry.get(decision_method, **{"domain":self.domain,"llm_name":self.llm_name})
+        self.decision_node.plugins = self._default_plugins_for_node(self.decision_node)
         self.nodes:Dict[str,Node] = {}
         self.potential_spatial_edges:List[List[str, str]] = []
         self.potential_temporal_edges:List[List[str,str]] = []
@@ -115,6 +116,38 @@ class Graph(ABC):
         self.temporal_logits = torch.nn.Parameter(torch.ones(len(self.potential_temporal_edges), requires_grad=optimized_temporal) * init_temporal_logit,
                                                  requires_grad=optimized_temporal) # trainable edge logits
         self.temporal_masks = torch.nn.Parameter(fixed_temporal_masks,requires_grad=False)  # fixed edge masks
+
+    @staticmethod
+    def _normalize_plugins(plugins: Any) -> List[str]:
+        if plugins is None:
+            return []
+        if isinstance(plugins, str):
+            return [plugins] if plugins else []
+        if isinstance(plugins, dict):
+            plugin_items = [f"{key}: {value}" for key, value in plugins.items() if str(value)]
+            return plugin_items if plugin_items else []
+        try:
+            return [str(plugin) for plugin in plugins if str(plugin)]
+        except TypeError:
+            plugin = str(plugins)
+            return [plugin] if plugin else []
+
+    @staticmethod
+    def _format_plugins(plugins: Any) -> str:
+        normalized_plugins = Graph._normalize_plugins(plugins)
+        return ", ".join(normalized_plugins) if normalized_plugins else "none"
+
+    @staticmethod
+    def _default_plugins_for_node(node: Node) -> List[str]:
+        if node.node_name == "CodeWriting" and node.role not in ("Normal Programmer", "Stupid Programmer"):
+            return ["Python executor"]
+        if node.node_name == "FinalWriteCode":
+            return ["Python executor"]
+        if node.node_name == "MathSolver" and node.role == "Programming Expert":
+            return ["Python executor"]
+        if node.node_name == "AnalyzeAgent" and node.role == "Wiki Searcher":
+            return ["Wikipedia search"]
+        return []
     
     def construct_features(self):
         features = []
@@ -122,10 +155,10 @@ class Graph(ABC):
             node = self.nodes[node_id]
             role_description = self.prompt_set.get_description(node.role)
             profile = (
-                f"Base: {node.llm_name or self.llm_name}\n"
+                f"Base: {node.base_profile or node.llm_name or self.llm_name}\n"
                 f"Role: {node.role}\n"
                 f"Role description: {role_description}\n"
-                "Plugin: none"
+                f"Plugin: {self._format_plugins(node.plugins)}"
             )
             feature = get_sentence_embedding(profile)
             features.append(feature)
@@ -181,9 +214,21 @@ class Graph(ABC):
         """
         for agent_name,kwargs in zip(self.agent_names,self.node_kwargs):
             if agent_name in AgentRegistry.registry:
+                kwargs = dict(kwargs)
+                base_profile = kwargs.pop("base_profile", kwargs.pop("base", None))
+                profile_state = kwargs.pop("profile_state", kwargs.pop("state", None))
+                plugins = kwargs.pop("plugins", kwargs.pop("plugin", None))
                 kwargs["domain"] = self.domain
                 kwargs["llm_name"] = self.llm_name
                 agent_instance = AgentRegistry.get(agent_name, **kwargs)
+                if base_profile is not None:
+                    agent_instance.base_profile = str(base_profile)
+                if profile_state is not None:
+                    agent_instance.profile_state = str(profile_state)
+                if plugins is not None:
+                    agent_instance.plugins = self._normalize_plugins(plugins)
+                else:
+                    agent_instance.plugins = self._default_plugins_for_node(agent_instance)
                 self.add_node(agent_instance)
     
     def init_potential_edges(self):
