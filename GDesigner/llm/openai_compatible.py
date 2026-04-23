@@ -21,9 +21,11 @@ def normalize_messages(messages: Union[str, List[Union[Message, Dict[str, str]]]
     return normalized
 
 
-def completion_text(content: Union[List[str], str]) -> str:
+def completion_text(content: Union[List[Optional[str]], Optional[str]]) -> str:
+    if content is None:
+        return ""
     if isinstance(content, list):
-        return "".join(content)
+        return "".join(item or "" for item in content)
     return content
 
 
@@ -77,9 +79,9 @@ async def chat_completion(
                 raise Exception(f"API error {response.status}: {response_data['error']}")
             choices = response_data["choices"]
             if num_comps and num_comps > 1:
-                content = [choice["message"]["content"] for choice in choices]
+                content = [choice["message"].get("content") or "" for choice in choices]
             else:
-                content = choices[0]["message"]["content"]
+                content = choices[0]["message"].get("content") or ""
 
     prompt_tokens, completion_tokens = usage_tokens(response_data)
     cost_count(
